@@ -15,3 +15,5 @@ The final caption text placement correction was compiled after the guest screens
 Not established: completed account/password setup, authentication after setup, Chrome installation/execution, driver download/install success, real audio loopback, BIOS desktop boot, or behavior on physical hardware. BIOS testing did not reach a desktop within the bounded test. No claim of universal hardware compatibility is made.
 
 This ISO targets amd64/x86-64 PCs. ARM, phones, consoles, Apple Silicon and other CPU architectures cannot run it natively. Firmware, storage, networking, graphics and audio each require supported hardware and compatible drivers. A virtual machine with emulated supported hardware is the most practical way to try it on a different host architecture; that does not guarantee compatibility or performance.
+
+File Explorer caption update: removed the application-name suffix and the initial application-name caption. Folder titles remain. The changed explorerframe component and ISO were rebuilt; this caption update has not had a separate VM check.
