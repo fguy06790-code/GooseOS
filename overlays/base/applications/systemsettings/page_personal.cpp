@@ -75,6 +75,12 @@ BuildPersonalization(PageBuilder &page)
     page.Toggle(Str(IDS_TRANSPARENCY), Str(IDS_TRANSPARENCY_DESC), L"window_apps_20_regular",
                 (effects & DWM_EFFECT_ACRYLIC) != 0, [](int on) { SetEffect(DWM_EFFECT_ACRYLIC, on != 0); });
 
+    page.Group(L"THYFOS windows");
+    DWORD opacity=ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,70);
+    SettingRow &opacityRow=page.Slider(L"Window opacity",L"70% opacity lets the wallpaper show through. 100% is solid.",
+        L"window_apps_20_regular",30,100,opacity>=30 && opacity<=100?(int)opacity:70,
+        [](int value) { SetWidget(THYFOS_WINDOW_OPACITY,value); });
+    opacityRow.Label=[](int value) { return Printf(L"%d%%",value); };
     page.Group(L"THYFOS desktop widgets");
     page.Toggle(L"Audio spectrum",L"Live frequency bars from system playback. No microphone or recording.",
         L"speaker_2_20_regular",ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,1)!=0,

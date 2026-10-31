@@ -40,3 +40,5 @@ WORK_ROOT=/path/to/writable/work sh build-linux.sh
 The GitHub Actions workflow runs the same build and uploads `THYFOS-amd64.iso` and `SHA256SUMS` as `THYFOS-amd64-ISO`. ISO binaries and downloaded Chrome installers are not committed.
 
 The simple THYFOS logo replaces the setup watermark, setup icon and legacy setup logo resource. Setup and Driver Updater use THYFOS titles in English. Each Driver Updater scan automatically downloads and installs missing or newer matching Wi-Fi drivers, retaining the existing hardware matching, architecture filtering and trust checks. Bluetooth choices are excluded. An existing internet connection is needed; if networking is unavailable, connect Ethernet or supported USB tethering and scan again. A VM using a virtual wired adapter does not need the host laptop's Wi-Fi driver in the guest.
+
+Compatible standard application windows default to 70% opacity (30% transparent). Settings > Personalization > Window opacity adjusts this from 30% to 100%. The shell leaves app-owned layered windows and windows using private/class drawing DCs unchanged. Desktop wallpaper remains solid.

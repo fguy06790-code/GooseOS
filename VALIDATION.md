@@ -19,3 +19,5 @@ This ISO targets amd64/x86-64 PCs. ARM, phones, consoles, Apple Silicon and othe
 File Explorer caption update: removed the application-name suffix and the initial application-name caption. Folder titles remain. The changed explorerframe component and ISO were rebuilt; this caption update has not had a separate VM check.
 
 THYFOS logo and automatic Wi-Fi update changes: compiled into the ISO. Actual Wi-Fi package download/install and the revised setup artwork have not been verified in a guest. The already-running VirtualBox VM remains on its previous installed version.
+
+Window opacity: rebuilt the amd64 ISO. A Windows test using an isolated test window verified alpha 179/255 at 70%, repeated application, restoration to a solid window at 100%, and preservation of existing application-owned alpha. Guest compositor rendering of this change has not been separately verified. The running VirtualBox VM is not modified by rebuilding the ISO.

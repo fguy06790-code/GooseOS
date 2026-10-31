@@ -36,6 +36,42 @@ static WCHAR WallpaperPath[MAX_PATH];
 static UINT ShellMessage;
 static HANDLE SetupProcess;
 static DWORD SetupPid;
+static DWORD WindowOpacity=70;
+static const WCHAR OpacityOwner[]=L"THYFOS.WindowOpacity";
+
+static void ApplyWindowOpacity(HWND W)
+{
+    LONG_PTR Style=GetWindowLongPtrW(W,GWL_EXSTYLE);
+    BOOL Owned=GetPropW(W,OpacityOwner)!=NULL;
+    if (WindowOpacity==100)
+    {
+        if (Owned)
+        {
+            SetWindowLongPtrW(W,GWL_EXSTYLE,Style&~WS_EX_LAYERED);
+            RemovePropW(W,OpacityOwner);
+            RedrawWindow(W,NULL,NULL,RDW_INVALIDATE|RDW_FRAME|RDW_ALLCHILDREN);
+        }
+        return;
+    }
+    if (!(GetWindowLongPtrW(W,GWL_STYLE)&WS_CAPTION) ||
+        (GetClassLongPtrW(W,GCL_STYLE)&(CS_OWNDC|CS_CLASSDC)) ||
+        ((Style&WS_EX_LAYERED) && !Owned)) return;
+    if (!Owned)
+    {
+        if (!SetPropW(W,OpacityOwner,(HANDLE)1)) return;
+        SetLastError(ERROR_SUCCESS);
+        if (!SetWindowLongPtrW(W,GWL_EXSTYLE,Style|WS_EX_LAYERED) && GetLastError()!=ERROR_SUCCESS)
+        { RemovePropW(W,OpacityOwner); return; }
+    }
+    BYTE Alpha=(BYTE)((WindowOpacity*255+50)/100), Current;
+    COLORREF Key; DWORD Flags;
+    if (GetLayeredWindowAttributes(W,&Key,&Current,&Flags) && Flags==LWA_ALPHA && Current==Alpha) return;
+    if (!SetLayeredWindowAttributes(W,0,Alpha,LWA_ALPHA))
+    {
+        SetWindowLongPtrW(W,GWL_EXSTYLE,Style&~WS_EX_LAYERED);
+        RemovePropW(W,OpacityOwner);
+    }
+}
 
 static int S(int V) { return (int)(V * Scale + 0.5f); }
 
@@ -86,6 +122,7 @@ static BOOL CALLBACK CollectTask(HWND W, LPARAM)
 {
     if (W == Desktop || !IsWindowVisible(W) || GetWindow(W, GW_OWNER) ||
         (GetWindowLongPtrW(W, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) || !GetWindowTextLengthW(W)) return TRUE;
+    ApplyWindowOpacity(W);
     if (TaskCount < (int)_countof(Tasks)) Tasks[TaskCount++] = W;
     return TRUE;
 }
@@ -273,6 +310,10 @@ static void Render(HDC Dc)
 static void ConfigureWidgets()
 {
     DWORD Value=1,Bytes=sizeof(Value);
+    DWORD Opacity=70,OpacityBytes=sizeof(Opacity);
+    RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,RRF_RT_REG_DWORD,NULL,&Opacity,&OpacityBytes);
+    WindowOpacity=Opacity>=30 && Opacity<=100?Opacity:70;
+    RefreshTasks();
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,RRF_RT_REG_DWORD,NULL,&Value,&Bytes);
     AudioWidget=Value!=0; Value=1; Bytes=sizeof(Value);
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_RESOURCE_WIDGET,RRF_RT_REG_DWORD,NULL,&Value,&Bytes);
