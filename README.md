@@ -51,3 +51,17 @@ Modern setup and motion:
 - Third-party apps can implement their own rendering and animation behavior.
 
 Liquid-glass setup uses the OS content-backdrop material at 217/255 alpha (about 85% opacity), with rounded-corner preference and a white specular outline. The desktop glass cards and sign-in cards use the same fill alpha. The shell exempts material-backed windows from additional whole-window fading to avoid double blending. Compatible ordinary application windows default to 85% opacity. Existing app-owned transparency remains respected.
+
+THYFOS Settings and desktop polish:
+- Settings is a visible launcher entry and opens with Win+I. The launcher supports arrow-key selection, Enter activation and hover feedback; the dock remains unpinned.
+- Settings opens to a THYFOS home page linking appearance/widgets, wallpaper, networking, sound, display, drivers, accounts and system information, with a Task Manager action.
+- The appearance control now reads Window transparency, defaulting to 15%, instead of requiring users to convert opacity percentages.
+- Changes broadcast to the desktop, setup and Settings glass materials. The Restore desktop defaults button restores 15% transparency, both widgets and a one-second resource refresh; it preserves the user's animation preference.
+- Existing native Settings categories, search and navigation are retained. No claim is made that every hardware-dependent setting works on every device.
+
+Rounded corners and Settings launch:
+- Standard captioned windows and owned dialogs receive a 14-pixel compositor radius unless the app supplies its own radius, requests square corners or owns a custom window region. Maximized/minimized windows retain native edge behavior.
+- System popup menus and combo dropdowns use the existing compositor's small rounded radius. Setup edits, combos and pushbuttons receive rounded clipping; the launcher and desktop cards already use rounded shapes.
+- Personalization exposes a Rounded window corners toggle. Restore desktop defaults enables it.
+- Settings launch resolves the actual installed path under %SystemRoot%\ImmersiveControlPanel, fixing the previous missing-app error from shell shortcuts and aliases.
+- The launcher temporarily raises the desktop while open, so it can receive focus over an existing app; it lowers when dismissed or deactivated.

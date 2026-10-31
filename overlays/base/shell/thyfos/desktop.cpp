@@ -31,7 +31,8 @@ static BOOL Launcher;
 static float LauncherMotion, LauncherFrom;
 static DWORD LauncherStarted;
 static RECT Dock, LauncherButton, Panel, Input, OpenButton, TaskRects[12], OldWorkArea;
-static RECT AppRows[2];
+static RECT AppRows[3];
+static int ActiveApp=-1;
 static HFONT BodyFont, ClockFont, HeadingFont;
 static HBRUSH EditBrush;
 static Gdiplus::Bitmap *Wallpaper;
@@ -41,6 +42,32 @@ static HANDLE SetupProcess;
 static DWORD SetupPid;
 static DWORD WindowOpacity=85;
 static const WCHAR OpacityOwner[]=L"THYFOS.WindowOpacity";
+static const WCHAR CornerOwner[]=L"THYFOS.RoundedWindow";
+static BOOL RoundedWindows=TRUE;
+
+static void ApplyWindowCorners(HWND W)
+{
+    BOOL Owned=GetPropW(W,CornerOwner)!=NULL;
+    ULONG_PTR Radius=(ULONG_PTR)GetPropW(W,DWM_PROP_CORNER_RADIUS);
+    if (!RoundedWindows || IsZoomed(W) || IsIconic(W))
+    {
+        if (Owned)
+        {
+            if (Radius==14) RemovePropW(W,DWM_PROP_CORNER_RADIUS);
+            RemovePropW(W,CornerOwner);
+        }
+        return;
+    }
+    if ((GetWindowLongPtrW(W,GWL_STYLE)&WS_CAPTION)!=WS_CAPTION ||
+        (ULONG_PTR)GetPropW(W,DWM_PROP_WINDOW_CORNER_PREFERENCE)==DWM_CORNER_DONOTROUND) return;
+    if (Radius) return;
+    HRGN Shape=CreateRectRgn(0,0,0,0);
+    if (!Shape) return;
+    int Region=GetWindowRgn(W,Shape); DeleteObject(Shape);
+    if (Region!=ERROR) return;
+    if (SetPropW(W,CornerOwner,(HANDLE)1) && !SetPropW(W,DWM_PROP_CORNER_RADIUS,(HANDLE)14))
+        RemovePropW(W,CornerOwner);
+}
 
 static void InitializeMotion()
 {
@@ -140,9 +167,11 @@ static void LoadWallpaper()
 
 static BOOL CALLBACK CollectTask(HWND W, LPARAM)
 {
-    if (W == Desktop || !IsWindowVisible(W) || GetWindow(W, GW_OWNER) ||
-        (GetWindowLongPtrW(W, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) || !GetWindowTextLengthW(W)) return TRUE;
+    if (W == Desktop || !IsWindowVisible(W) ||
+        (GetWindowLongPtrW(W, GWL_EXSTYLE) & WS_EX_TOOLWINDOW)) return TRUE;
     ApplyWindowOpacity(W);
+    ApplyWindowCorners(W);
+    if (GetWindow(W,GW_OWNER) || !GetWindowTextLengthW(W)) return TRUE;
     if (TaskCount < (int)_countof(Tasks)) Tasks[TaskCount++] = W;
     return TRUE;
 }
@@ -159,7 +188,7 @@ static void Arrange()
     OffsetRect(&Panel,0,(int)(S(24)*(1.0f-LauncherMotion)));
     SetRect(&Input, Panel.left+S(20), Panel.top+S(24), Panel.right-S(20), Panel.top+S(72));
     SetRect(&OpenButton, Panel.right-S(120), Panel.bottom-S(66), Panel.right-S(20), Panel.bottom-S(24));
-    for (int I=0; I<2; ++I)
+    for (int I=0; I<(int)_countof(AppRows); ++I)
         SetRect(&AppRows[I],Panel.left+S(20),Input.bottom+S(100+I*78),Panel.right-S(20),Input.bottom+S(168+I*78));
     int CardWidth=min(S(420),Width-S(48));
     SetRect(&ResourceCard,Width-S(24)-CardWidth,Dock.top-S(174),Width-S(24),Dock.top-S(18));
@@ -180,7 +209,7 @@ static void RefreshTasks()
 
 static void Glass(Gdiplus::Graphics &G, const RECT &R, int Radius)
 {
-    Round(G, R, (float)S(Radius), 217, RGB(42,64,88));
+    Round(G, R, (float)S(Radius), (BYTE)((WindowOpacity*255+50)/100), RGB(42,64,88));
     Round(G, R, (float)S(Radius), 95, RGB(237,247,255), TRUE);
 }
 
@@ -312,11 +341,11 @@ static void Render(HDC Dc)
         RECT Heading={Panel.left+S(28), Input.bottom+S(30), Panel.right-S(28), Input.bottom+S(72)};
         Label(Dc, HeadingFont, L"Launcher", Heading);
         WCHAR ChromePath[MAX_PATH];
-        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer"};
-        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular"};
-        for (int I=0; I<2; ++I)
+        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer",L"Settings"};
+        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular",L"settings_20_regular"};
+        for (int I=0; I<(int)_countof(AppRows); ++I)
         {
-            Round(G,AppRows[I],(float)S(16),35,RGB(218,237,255));
+            Round(G,AppRows[I],(float)S(16),I==ActiveApp?85:35,RGB(218,237,255));
             ShellFrame::FillIcon(G,Icons[I],Gdiplus::RectF((float)(AppRows[I].left+S(16)),
                 (float)(AppRows[I].top+S(19)),(float)S(30),(float)S(30)),RGB(228,241,255));
             G.Flush(Gdiplus::FlushIntentionSync);
@@ -333,6 +362,9 @@ static void ConfigureWidgets()
     DWORD Opacity=85,OpacityBytes=sizeof(Opacity);
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,RRF_RT_REG_DWORD,NULL,&Opacity,&OpacityBytes);
     WindowOpacity=Opacity>=30 && Opacity<=100?Opacity:85;
+    DWORD RoundValue=1,RoundBytes=sizeof(RoundValue);
+    RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_ROUND_WINDOWS,RRF_RT_REG_DWORD,NULL,&RoundValue,&RoundBytes);
+    RoundedWindows=RoundValue!=0;
     RefreshTasks();
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,RRF_RT_REG_DWORD,NULL,&Value,&Bytes);
     AudioWidget=Value!=0; Value=1; Bytes=sizeof(Value);
@@ -348,6 +380,7 @@ static void ConfigureWidgets()
 static void ToggleLauncher()
 {
     Launcher=!Launcher;
+    ActiveApp=-1;
     BOOL Motion=TRUE;
     ANIMATIONINFO Animation={sizeof(Animation)};
     SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&Motion,0);
@@ -357,8 +390,9 @@ static void ToggleLauncher()
     if (Motion) SetTimer(Desktop,4,16,NULL);
     else { LauncherMotion=Launcher?1.0f:0.0f; Arrange(); }
     ShowWindow(Search, Launcher?SW_SHOW:SW_HIDE);
+    SetWindowPos(Desktop,Launcher?HWND_TOP:HWND_BOTTOM,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
     InvalidateRect(Desktop, NULL, FALSE);
-    if (Launcher) SetFocus(Search);
+    if (Launcher) { SetForegroundWindow(Desktop); SetFocus(Search); }
 }
 
 static void OpenProgram(PCWSTR File, PCWSTR Args=NULL)
@@ -367,6 +401,14 @@ static void OpenProgram(PCWSTR File, PCWSTR Args=NULL)
     if ((INT_PTR)Result<=32)
         MessageBoxW(Desktop,L"The app or path could not be opened. Check the name and try again.",L"THYFOS",MB_OK|MB_ICONINFORMATION);
     else { SetWindowTextW(Search,L""); if (Launcher) ToggleLauncher(); }
+}
+
+static void OpenSettings()
+{
+    WCHAR File[MAX_PATH];
+    if (!GetWindowsDirectoryW(File,_countof(File)) ||
+        FAILED(StringCchCatW(File,_countof(File),L"\\ImmersiveControlPanel\\SystemSettings.exe"))) return;
+    OpenProgram(File);
 }
 
 static BOOL CALLBACK FocusSetup(HWND W, LPARAM)
@@ -427,7 +469,8 @@ static void OpenCommand()
     if (!Command[0]) return;
     StrTrimW(Command,L" \t");
     if (!lstrcmpiW(Command,L"chrome") || !lstrcmpiW(Command,L"google chrome")) { OpenChrome(); return; }
-    if (!lstrcmpiW(Command,L"settings")) { OpenProgram(L"systemsettings.exe"); return; }
+    if (!lstrcmpiW(Command,L"settings") || !lstrcmpiW(Command,L"systemsettings") ||
+        !lstrcmpiW(Command,L"systemsettings.exe")) { OpenSettings(); return; }
     if (!lstrcmpiW(Command,L"explorer") || !lstrcmpiW(Command,L"file explorer")) { OpenProgram(L"filebrowser.exe"); return; }
     StringCchCopyW(File, _countof(File), Command);
     Args[0]=0;
@@ -441,9 +484,24 @@ static void OpenCommand()
 }
 
 static WNDPROC OldEditProc;
+static void OpenLauncherApp(int Index)
+{
+    if (Index==0) OpenChrome();
+    else if (Index==1) OpenProgram(L"filebrowser.exe");
+    else if (Index==2) OpenSettings();
+}
+
 static LRESULT CALLBACK EditProc(HWND W, UINT M, WPARAM A, LPARAM B)
 {
-    if (M==WM_KEYDOWN && A==VK_RETURN) { OpenCommand(); return 0; }
+    if (M==WM_KEYDOWN && (A==VK_UP || A==VK_DOWN))
+    {
+        ActiveApp=A==VK_DOWN?(ActiveApp+1)%3:(ActiveApp<0?2:(ActiveApp+2)%3);
+        InvalidateRect(Desktop,&Panel,FALSE); return 0;
+    }
+    if (M==WM_KEYDOWN && A==VK_RETURN)
+    { if (ActiveApp>=0) OpenLauncherApp(ActiveApp); else OpenCommand(); return 0; }
+    if (M==WM_CHAR || M==WM_SETFOCUS)
+    { ActiveApp=-1; InvalidateRect(Desktop,&Panel,FALSE); }
     if (M==WM_KEYDOWN && A==VK_ESCAPE) { if (Launcher) ToggleLauncher(); return 0; }
     LRESULT Result=CallWindowProcW(OldEditProc,W,M,A,B);
     if (M==WM_PAINT && !GetWindowTextLengthW(W))
@@ -467,7 +525,7 @@ static void ContextMenu(POINT P)
     DestroyMenu(Menu);
     if (Id==1) ToggleLauncher();
     if (Id==2) ShellExecuteW(Desktop,L"open",L"filebrowser.exe",NULL,NULL,SW_SHOWNORMAL);
-    if (Id==3) ShellExecuteW(Desktop,L"open",L"systemsettings.exe",NULL,NULL,SW_SHOWNORMAL);
+    if (Id==3) OpenSettings();
     if (Id==4) ExitWindowsEx(EWX_LOGOFF,0);
     if (Id==5) OpenChrome();
 }
@@ -498,6 +556,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             { RECT Work={0,0,Width,Dock.top-S(8)}; SystemParametersInfoW(SPI_SETWORKAREA,0,&Work,SPIF_SENDCHANGE); }
             ShellMessage=RegisterWindowMessageW(L"SHELLHOOK"); RegisterShellHookWindow(W);
             RegisterHotKey(W,1,MOD_CONTROL,VK_SPACE);
+            RegisterHotKey(W,2,MOD_WIN,'I');
             SetTimer(W,1,60000,NULL);
             return 0;
         case WM_PAINT:
@@ -515,7 +574,10 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             RestoreDC(FrameDC,Saved); EndPaint(W,&P); return 0;
         }
         case WM_ERASEBKGND: return 1;
-        case WM_HOTKEY: if (A==1) ToggleLauncher(); return 0;
+        case WM_HOTKEY:
+            if (A==1) ToggleLauncher();
+            if (A==2) OpenSettings();
+            return 0;
         case WM_TIMER:
             if (A==4)
             {
@@ -548,6 +610,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             else if (Launcher && PtInRect(&OpenButton,P)) OpenCommand();
             else if (Launcher && PtInRect(&AppRows[0],P)) OpenChrome();
             else if (Launcher && PtInRect(&AppRows[1],P)) OpenProgram(L"filebrowser.exe");
+            else if (Launcher && PtInRect(&AppRows[2],P)) OpenSettings();
             else
             {
                 for (int I=0;I<TaskCount;++I) if (PtInRect(&TaskRects[I],P))
@@ -556,16 +619,32 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             }
             return 0;
         }
+        case WM_MOUSEMOVE:
+        {
+            POINT P={GET_X_LPARAM(B),GET_Y_LPARAM(B)}; int Index=-1;
+            if (Launcher) for (int I=0; I<(int)_countof(AppRows); ++I)
+                if (PtInRect(&AppRows[I],P)) Index=I;
+            if (Index!=ActiveApp) { ActiveApp=Index; InvalidateRect(W,&Panel,FALSE); }
+            if (Index>=0) SetCursor(LoadCursorW(NULL,IDC_HAND));
+            return 0;
+        }
         case WM_CONTEXTMENU: { POINT P; GetCursorPos(&P); ContextMenu(P); return 0; }
         case WM_CTLCOLOREDIT:
             SetTextColor((HDC)A,RGB(237,246,255)); SetBkColor((HDC)A,RGB(50,71,94)); return (LRESULT)EditBrush;
         case WM_ACTIVATE:
-            SetWindowPos(W,HWND_BOTTOM,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE); return 0;
+            if (LOWORD(A)==WA_INACTIVE && Launcher)
+            {
+                Launcher=FALSE; LauncherMotion=0; KillTimer(W,4); ShowWindow(Search,SW_HIDE);
+                Arrange(); InvalidateRect(W,NULL,FALSE);
+            }
+            if (!Launcher) SetWindowPos(W,HWND_BOTTOM,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+            return 0;
         case WM_CLOSE: return 0;
         case WM_DESTROY:
             if (FrameDC)
             { SelectObject(FrameDC,FrameOriginal); DeleteObject(FrameBitmap); DeleteDC(FrameDC); FrameDC=NULL; }
             UnregisterHotKey(W,1);
+            UnregisterHotKey(W,2);
             DeregisterShellHookWindow(W); KillTimer(W,1); KillTimer(W,2); KillTimer(W,3); KillTimer(W,4); Meters.StopAudio();
             delete Backdrop; Backdrop=NULL;
             SystemParametersInfoW(SPI_SETWORKAREA,0,&OldWorkArea,SPIF_SENDCHANGE);

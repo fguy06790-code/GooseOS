@@ -10,6 +10,7 @@
 
 #include "resource.h"
 #include <reactos/dwmsettings.h>
+#include "../../shell/thyfos/preferences.h"
 
 #define NDEBUG
 #include <debug.h>
@@ -32,6 +33,19 @@ typedef struct _SETUP_FRAME
 } SETUP_FRAME;
 
 static SETUP_FRAME Frame;
+
+static VOID FrameApplyGlass(HWND hwnd)
+{
+    DWORD Opacity=85,Bytes=sizeof(Opacity);
+    HIGHCONTRASTW Contrast={sizeof(Contrast)};
+    if (SystemParametersInfoW(SPI_GETHIGHCONTRAST,sizeof(Contrast),&Contrast,0) &&
+        (Contrast.dwFlags&HCF_HIGHCONTRASTON))
+    { DwmSettingsClearContentBackdrop(hwnd); return; }
+    RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,RRF_RT_REG_DWORD,NULL,&Opacity,&Bytes);
+    if (Opacity<30 || Opacity>100) Opacity=85;
+    DwmSettingsSetContentBackdrop(hwnd,RGB(239,245,252),(Opacity*255+50)/100);
+    SetPropW(hwnd,DWM_PROP_BACKDROP_COLORIZATION,(HANDLE)(ULONG_PTR)(RGB(221,234,248)+1));
+}
 
 static BOOL FrameMotion(VOID)
 {
@@ -59,7 +73,17 @@ static LRESULT CALLBACK FramePageProc(HWND hwnd, UINT Message, WPARAM WParam, LP
 
 static BOOL CALLBACK FrameSetFont(HWND hwnd, LPARAM Font)
 {
+    WCHAR Class[32];
     SendMessageW(hwnd, WM_SETFONT, Font, FALSE);
+    GetClassNameW(hwnd,Class,ARRAYSIZE(Class));
+    if (!lstrcmpiW(Class,L"Edit") || !lstrcmpiW(Class,L"ComboBox") ||
+        (!lstrcmpiW(Class,L"Button") && (GetWindowLongPtrW(hwnd,GWL_STYLE)&BS_TYPEMASK)<=BS_DEFPUSHBUTTON))
+    {
+        RECT Rect;
+        GetWindowRect(hwnd,&Rect);
+        HRGN Region=CreateRoundRectRgn(0,0,Rect.right-Rect.left+1,Rect.bottom-Rect.top+1,10,10);
+        if (Region && !SetWindowRgn(hwnd,Region,TRUE)) DeleteObject(Region);
+    }
     return TRUE;
 }
 
@@ -556,8 +580,7 @@ SetupFrameProc(
                 DWORD Backdrop = DWMSBT_TRANSIENTWINDOW;
                 DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &Corner, sizeof(Corner));
                 DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &Backdrop, sizeof(Backdrop));
-                DwmSettingsSetContentBackdrop(hwnd, RGB(239, 245, 252), 217);
-                SetPropW(hwnd, DWM_PROP_BACKDROP_COLORIZATION, (HANDLE)(ULONG_PTR)(RGB(221, 234, 248) + 1));
+                FrameApplyGlass(hwnd);
             }
 
             GetWindowRect(GetDlgItem(hwnd, IDC_FRAME_PAGE), &rc);
@@ -601,6 +624,11 @@ SetupFrameProc(
         case WM_DRAWITEM:
             if (wParam == IDC_FRAME_NEXT || wParam == IDC_FRAME_BACK || wParam == IDCANCEL)
             { FrameDrawButton((const DRAWITEMSTRUCT *)lParam); return TRUE; }
+            break;
+
+        case WM_SETTINGCHANGE:
+            FrameApplyGlass(hwnd);
+            InvalidateRect(hwnd,NULL,TRUE);
             break;
 
         case WM_ACTIVATE:

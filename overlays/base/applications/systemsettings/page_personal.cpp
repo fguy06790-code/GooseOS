@@ -61,8 +61,7 @@ SetEffect(DWORD effect, bool on)
 static void SetWidget(LPCWSTR name,DWORD value)
 {
     WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,name,value);
-    HWND desktop=FindWindowW(L"THYFOS.Desktop",NULL);
-    if (desktop) PostMessageW(desktop,WM_SETTINGCHANGE,0,0);
+    BroadcastSetting(THYFOS_DESKTOP_KEY);
 }
 
 void
@@ -84,10 +83,13 @@ BuildPersonalization(PageBuilder &page)
 
     page.Group(L"THYFOS windows");
     DWORD opacity=ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,85);
-    SettingRow &opacityRow=page.Slider(L"Window opacity",L"85% opacity means 15% transparency. 100% is solid.",
-        L"window_apps_20_regular",30,100,opacity>=30 && opacity<=100?(int)opacity:85,
-        [](int value) { SetWidget(THYFOS_WINDOW_OPACITY,value); });
+    SettingRow &opacityRow=page.Slider(L"Window transparency",L"Control how much of the background is visible. 0% is solid.",
+        L"window_apps_20_regular",0,70,opacity>=30 && opacity<=100?100-(int)opacity:15,
+        [](int value) { SetWidget(THYFOS_WINDOW_OPACITY,100-value); });
     opacityRow.Label=[](int value) { return Printf(L"%d%%",value); };
+    page.Toggle(L"Rounded window corners",L"Soften standard windows. Maximized windows stay flush with the screen.",
+        L"window_apps_20_regular",ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_ROUND_WINDOWS,1)!=0,
+        [](int on) { SetWidget(THYFOS_ROUND_WINDOWS,on!=0); });
     page.Group(L"THYFOS desktop widgets");
     page.Toggle(L"Audio spectrum",L"Live frequency bars from system playback. No microphone or recording.",
         L"speaker_2_20_regular",ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,1)!=0,
@@ -99,6 +101,18 @@ BuildPersonalization(PageBuilder &page)
     DWORD rate=ReadDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_REFRESH_SECONDS,1);
     page.Choice(L"Resource refresh",L"How often the resource widget samples hardware counters.",NULL,rates,
         rate>=1 && rate<=5?(int)rate-1:0,[](int index) { SetWidget(THYFOS_REFRESH_SECONDS,index+1); });
+    SettingsHost *host=page.Host;
+    page.Button(L"Restore desktop defaults",L"15% transparency, rounded windows, both widgets and a 1-second refresh.",
+        L"arrow_counterclockwise_20_regular",L"Restore",[host](int)
+        {
+            WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,85);
+            WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_ROUND_WINDOWS,1);
+            WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,1);
+            WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_RESOURCE_WIDGET,1);
+            WriteDword(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_REFRESH_SECONDS,1);
+            BroadcastSetting(THYFOS_DESKTOP_KEY);
+            host->Refresh();
+        });
 
     page.Group(Str(IDS_VISUAL_EFFECTS));
     page.Toggle(Str(IDS_ANIMATIONS), Str(IDS_ANIMATIONS_DESC), L"slide_text_20_regular",

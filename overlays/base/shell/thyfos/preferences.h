@@ -4,3 +4,4 @@
 #define THYFOS_RESOURCE_WIDGET L"ResourceWidget"
 #define THYFOS_REFRESH_SECONDS L"RefreshSeconds"
 #define THYFOS_WINDOW_OPACITY L"WindowOpacity"
+#define THYFOS_ROUND_WINDOWS L"RoundedWindows"
