@@ -75,3 +75,8 @@ Bundled Intel Wi-Fi package:
 - This Intel package targets Windows 10/11. Actual installation and hardware operation on LiberNT/THYFOS are unverified.
 - Package details: https://www.intel.com/content/www/us/en/download/19351/intel-wireless-wi-fi-drivers-for-windows-10-and-windows-11.html
 - Silent installation reference: https://www.intel.com/content/www/us/en/support/articles/000055825/wireless.html
+
+## THYFOS 1.0.0
+
+Initial release: see RELEASE_NOTES.md for downloads, features and known issues. VERSION identifies the THYFOS product release; it does not change the base NT compatibility version. The ISO includes release.json and displays the version in setup and Settings.
+

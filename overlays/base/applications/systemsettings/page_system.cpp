@@ -6,6 +6,7 @@
  */
 
 #include "settings.h"
+#include <reactos/thyfosversion.h>
 #include <powrprof.h>
 #include <algorithm>
 
@@ -68,7 +69,7 @@ RenameComputer(HWND owner)
 void
 BuildHome(PageBuilder &page)
 {
-    page.Hero(L"THYFOS", L"Personalize your desktop and manage your computer.", L"home_20_regular");
+    page.Hero(L"THYFOS", L"Version " THYFOS_VERSION L" · Personalize your desktop and manage your computer.", L"home_20_regular");
     page.Group(L"Make it yours");
     page.Navigate(L"Appearance & widgets", L"Glass transparency, animations, audio spectrum and resource monitor.",
         L"paint_brush_20_regular", PageId::Personalization);

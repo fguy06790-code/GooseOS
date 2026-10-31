@@ -10,6 +10,7 @@
 
 #include "resource.h"
 #include <reactos/dwmsettings.h>
+#include <reactos/thyfosversion.h>
 #include "../../shell/thyfos/preferences.h"
 
 #define NDEBUG
@@ -544,7 +545,7 @@ SetupFrameProc(
                 StringCchCopyW(Font.lfFaceName, ARRAYSIZE(Font.lfFaceName), L"Selawik");
                 Frame.BodyFont = CreateFontIndirectW(&Font);
             }
-            SetWindowTextW(hwnd, L"THYFOS Setup");
+            SetWindowTextW(hwnd, L"THYFOS " THYFOS_VERSION L" Setup");
             EnumChildWindows(hwnd, FrameSetFont, (LPARAM)Frame.BodyFont);
             SendDlgItemMessageW(hwnd, IDC_FRAME_NEXT, BM_SETSTYLE, BS_OWNERDRAW, FALSE);
             SendDlgItemMessageW(hwnd, IDC_FRAME_BACK, BM_SETSTYLE, BS_OWNERDRAW, FALSE);

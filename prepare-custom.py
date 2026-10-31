@@ -1,9 +1,13 @@
 import pathlib
+import json
 import re
 import shutil
 import sys
 
 source, config = map(pathlib.Path, sys.argv[1:])
+version = (config / 'VERSION').read_text().strip()
+if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+    raise SystemExit('VERSION must contain a numeric semantic version')
 overlays = config / 'overlays'
 if overlays.is_dir():
     for item in overlays.rglob('*'):
@@ -56,4 +60,11 @@ if wallpaper.is_file():
     content = hive.read_text().replace('\\Web\\Wallpaper\\BlueHorizon.png', '\\Web\\Wallpaper\\thyfos-wallpaper.bmp')
     content = content.replace('"ThemeActive",2,"1"', '"ThemeActive",2,"0"')
     hive.write_text(content)
-print('THYFOS boot, login, desktop, first-boot setup and native window controls prepared')
+version_header = source / 'sdk/include/reactos/thyfosversion.h'
+version_header.write_text('#pragma once\n#define THYFOS_VERSION L"' + version + '"\n')
+revision = re.search(r'^SOURCE_COMMIT=([a-f0-9]{40})$', (config / 'build-linux.sh').read_text(), re.M).group(1)
+(source / 'base/shell/thyfos/release.json').write_text(json.dumps({
+    'product': 'THYFOS', 'version': version, 'architecture': 'amd64',
+    'release_tag': 'v' + version, 'base': 'LiberNT', 'base_commit': revision
+}, indent=2) + '\n')
+print('THYFOS ' + version + ' boot, login, desktop, first-boot setup and native window controls prepared')
