@@ -710,7 +710,12 @@ DWORD InstallBundledWifi(_In_ POOBE_PROGRESS Progress)
     OOBE_APP App={0};
     if (_wcsicmp(GetArchitectureName(),L"amd64") || !IntelWifiPresent()) return ERROR_SUCCESS;
     if (RegGetValueW(HKEY_LOCAL_MACHINE,KeyName,L"Attempted",RRF_RT_REG_DWORD,NULL,&Attempted,&Bytes)==ERROR_SUCCESS && Attempted)
-        return ERROR_SUCCESS;
+    {
+        Bytes=sizeof(Result);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE,KeyName,L"Result",RRF_RT_REG_DWORD,NULL,&Result,&Bytes)!=ERROR_SUCCESS)
+            return ERROR_INVALID_DATA;
+        return IsInstallSuccess(Result)?ERROR_SUCCESS:Result;
+    }
     if (!GetWindowsDirectoryW(Path,ARRAYSIZE(Path)) ||
         FAILED(StringCchCatW(Path,ARRAYSIZE(Path),L"\\DriverSetup\\" THYFOS_WIFI_FILENAME)) ||
         !GetWindowsDirectoryW(Log,ARRAYSIZE(Log)) ||

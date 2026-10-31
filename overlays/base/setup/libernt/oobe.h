@@ -54,6 +54,8 @@ InstallOobeApp(
     _In_ POOBE_PROGRESS Progress);
 
 DWORD InstallBundledWifi(_In_ POOBE_PROGRESS Progress);
+DWORD NetworkSetupResult(VOID);
+INT_PTR CALLBACK NetworkPageProc(HWND, UINT, WPARAM, LPARAM);
 
 VOID
 OobeResultText(

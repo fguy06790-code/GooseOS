@@ -19,6 +19,11 @@
 
 
 #define IDC_STATIC          -1
+#define IDD_NETWORKPAGE      2800
+#define IDC_NETWORK_WIFI     2801
+#define IDC_NETWORK_REFRESH  2802
+#define IDS_NETWORKTITLE     5800
+#define IDS_NETWORKSUBTITLE  5801
 
 /* Dialogs */
 #define IDD_PROCESSPAGE      2060

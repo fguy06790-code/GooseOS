@@ -51,6 +51,7 @@ static const SETUP_PAGE_INFO OobePages[] =
 {
     { IDD_STORAGEPAGE,  StoragePageProc,  IDS_OOBE_STORAGETITLE, IDS_OOBE_STORAGESUBTITLE, SETUP_PAGE_CLOSE },
     { IDD_LANGUAGEPAGE, LanguagePageProc, IDS_OOBE_REGIONTITLE, IDS_OOBE_REGIONSUBTITLE, SETUP_PAGE_CLOSE },
+    { IDD_NETWORKPAGE, NetworkPageProc, IDS_NETWORKTITLE, IDS_NETWORKSUBTITLE, SETUP_PAGE_BACK | SETUP_PAGE_CLOSE },
     { IDD_ACCOUNTPAGE,  AccountPageProc,  IDS_ACCOUNTTITLE,     IDS_ACCOUNTZONESUBTITLE, SETUP_PAGE_BACK | SETUP_PAGE_CLOSE },
     { IDD_APPSPAGE,     AppsPageProc,     IDS_APPSTITLE,        IDS_APPSSUBTITLE,        SETUP_PAGE_BACK | SETUP_PAGE_CLOSE },
     { IDD_PROCESSPAGE,  FinishPageProc,   IDS_OOBE_FINISHTITLE, IDS_OOBE_FINISHSUBTITLE, SETUP_PAGE_CLOSE },
@@ -664,8 +665,8 @@ FinishThread(
 Components:
     PostMessageW(Context->hwndDlg, PM_APPLY_DONE, 0, 0);
     hrCom = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    WifiError=InstallBundledWifi(&Context->Progress);
-    if (WifiError!=ERROR_SUCCESS)
+    WifiError=ComponentsOnly?InstallBundledWifi(&Context->Progress):NetworkSetupResult();
+    if (ComponentsOnly && WifiError!=ERROR_SUCCESS)
     {
         WCHAR Text[512];
         StringCchPrintfW(Text,ARRAYSIZE(Text),L"The bundled Intel Wi-Fi installer did not complete (error %lu). "

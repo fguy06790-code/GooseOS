@@ -80,6 +80,14 @@ Bundled Intel Wi-Fi package:
 
 Initial release: see RELEASE_NOTES.md for downloads, features and known issues. VERSION identifies the THYFOS product release; it does not change the base NT compatibility version. The ISO includes release.json and displays the version in setup and Settings.
 
+## First-boot network setup
+
+First boot now runs language selection, network preparation, account creation, and app installation in that order. The network step automatically attempts the exact bundled Intel Wi-Fi 24.80.0 installer on matching Intel wireless hardware before offering Wi-Fi selection. On an available wireless interface, it opens Settings > Wi-Fi: choose a network, select Connect and enter its password. Return to setup and choose Next. The Choose Wi-Fi and Check again buttons allow reopening Settings or detecting an adapter that has become available. Setup does not collect or log your network password; the existing WLAN connection UI manages the profile.
+
+Driver failures remain visible, and a requested restart is explained. Setup allows offline continuation, while preserving the once-only installer-attempt policy. Components-only repair retains the driver-before-download sequence. Other wireless vendors need their own matching drivers. This is an installer attempt, not a guarantee that the Windows driver will bind or work on THYFOS.
+
+VirtualBox normally exposes virtual Ethernet rather than the host's Wi-Fi interface. Connect Windows to Wi-Fi and leave the VM's NAT adapter enabled; the guest then uses virtual Ethernet. Selecting a wireless SSID inside the guest requires a supported Wi-Fi adapter exposed to the guest, such as suitable USB passthrough hardware. The Intel installer is never run on the Windows host by these build or test steps.
+
 ## THYFOS Store and package manager
 
 The next build adds THYFOS Store to the launcher, desktop context menu, Settings Home and Settings > Apps. Type `store` or `thyfos store` in the launcher, or run `thyfos-store.exe`. The graphical app shares the existing `lntget` backend: search by name or category, inspect publisher/version/installer details, download, install, refresh the catalog, and open installed-app management. It checks the community source signature and block map and verifies installer SHA-256 before execution.
