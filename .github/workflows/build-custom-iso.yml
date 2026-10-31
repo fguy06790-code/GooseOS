@@ -1,97 +1,23 @@
-name: Compile Super-Lightweight LiberNT ISO
-
+name: Compile THYFOS amd64 ISO
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
-
+    branches: [main, master]
 jobs:
   build-superlight-iso:
-    name: Compile Super-Lightweight LiberNT ISO
-    runs-on: windows-latest
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout Custom Configurations
-        uses: actions/checkout@v4
-
-      - name: Install Ninja
-        run: choco install -y ninja
-
-      - name: Install Flex & Bison
-        shell: powershell
-        run: |
-          Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/reactos/tools/flexbison.7z" -OutFile "flexbison.7z"
-          7z x flexbison.7z -O"${{ github.workspace }}\bin"
-          "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "BISON_PKGDATADIR=${{ github.workspace }}\bin\share\bison" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "M4=${{ github.workspace }}\bin\m4.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Activate MSVC Developer Environment (amd64)
-        uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/checkout@v4
+      - name: Install prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential git cmake ninja-build flex bison curl python3 xz-utils
+      - name: Build customized amd64 ISO
+        env:
+          WORK_ROOT: ${{ runner.temp }}/libernt-work
+          OUTPUT_DIR: ${{ github.workspace }}/outputs
+        run: sh build-linux.sh
+      - uses: actions/upload-artifact@v4
         with:
-          arch: amd64
-
-      - name: Clone LiberNT Source Code
-        run: |
-          git clone --depth 1 https://github.com/LiberNT/LiberNT.git src
-
-      - name: Download & Strip Cairo Desktop
-        shell: powershell
-        run: |
-          $cairoUrl = (Invoke-RestMethod -Uri "https://api.github.com/repos/cairoshell/cairoshell/releases/latest").assets | Where-Object { $_.name -like "*64*.zip" } | Select-Object -First 1 -ExpandProperty browser_download_url
-          Write-Host "Downloading Cairo from $cairoUrl"
-          Invoke-WebRequest -Uri $cairoUrl -OutFile "cairo.zip"
-          Expand-Archive -Path "cairo.zip" -DestinationPath "src\modules\cairo\files"
-
-          # Remove bloat / non-English locales
-          Get-ChildItem -Path "src\modules\cairo\files" -Directory | Where-Object { $_.Name.Length -eq 2 -or $_.Name -like "*-*"} | Remove-Item -Recurse -Force
-          Get-ChildItem -Path "src\modules\cairo\files" -Include *.pdb, *.xml -Recurse | Remove-Item -Force
-
-          # Copy our optimized CairoSettings
-          Copy-Item "CairoSettings.xml" -Destination "src\modules\cairo\files\CairoSettings.xml" -Force
-
-          # CMake definition for Cairo
-          $cmakeContent = @"
-          file(GLOB_RECURSE CAIRO_BINARIES "files/*.*")
-          foreach(ITEM `${CAIRO_BINARIES})
-              file(RELATIVE_PATH REL_PATH "`${CMAKE_CURRENT_SOURCE_DIR}/files" `${ITEM})
-              get_filename_component(REL_DIR `${REL_PATH} DIRECTORY)
-              add_cd_file(FILE `${ITEM} TARGET bootcd DESTINATION "reactos/CairoDesktop/`${REL_DIR}" FOR all)
-          endforeach()
-          "@
-          Set-Content -Path "src\modules\cairo\CMakeLists.txt" -Value $cmakeContent
-
-      - name: Inject Custom Boot Logo & Super-Lightweight Tweaks
-        shell: powershell
-        run: |
-          # 1. Custom boot logo
-          Copy-Item "custom-bootlogo.bmp" -Destination "src\ntoskrnl\inbv\logo\1.bmp" -Force
-          Copy-Item "custom-bootlogo.bmp" -Destination "src\ntoskrnl\inbv\logo\5.bmp" -Force -ErrorAction SilentlyContinue
-
-          # 2. Patch hivesft.inf (Default shell -> Cairo Desktop)
-          $hivesft = Get-ChildItem -Path "src" -Filter "hivesft.inf" -Recurse | Select-Object -First 1
-          (Get-Content $hivesft.FullName) -replace '"explorer.exe"', '"%SystemRoot%\CairoDesktop\CairoDesktop.exe"' | Set-Content $hivesft.FullName
-
-          # 3. Patch hivesys.inf (Disable spooler and heavy services)
-          $hivesys = Get-ChildItem -Path "src" -Filter "hivesys.inf" -Recurse | Select-Object -First 1
-          $sysContent = Get-Content $hivesys.FullName
-          $sysContent = $sysContent -replace '("Spooler","Start",0x00010001,)0x00000002', '$10x00000004'
-          $sysContent = $sysContent -replace '("Themes","Start",0x00010001,)0x00000002', '$10x00000004'
-          $sysContent = $sysContent -replace '("RemoteRegistry","Start",0x00010001,)0x00000002', '$10x00000004'
-          $sysContent = $sysContent -replace '("Dbgk","Start",0x00010001,)0x00000002', '$10x00000004'
-          Set-Content -Path $hivesys.FullName -Value $sysContent
-
-      - name: Configure CMake with MSVC Toolchain
-        run: |
-          cmake -S src -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE:FILEPATH=toolchain-msvc.cmake -DARCH:STRING=amd64 -DCMAKE_BUILD_TYPE=Release
-
-      - name: Compile LiberNT bootcd ISO
-        run: |
-          cmake --build build --target bootcd
-
-      - name: Upload Super-Lightweight Bootable ISO
-        uses: actions/upload-artifact@v4
-        with:
-          name: LiberNT-SuperLight-Cairo-ISO
-          path: build/bootcd.iso
+          name: THYFOS-amd64-ISO
+          path: outputs/*
+          if-no-files-found: error
           retention-days: 7
