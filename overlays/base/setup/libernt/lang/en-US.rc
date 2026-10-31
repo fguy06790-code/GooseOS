@@ -2,18 +2,17 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 /* Dialogs */
 
-IDD_SETUPFRAME DIALOGEX 0, 0, 420, 240
+IDD_SETUPFRAME DIALOGEX 0, 0, 440, 280
 STYLE DS_SHELLFONT | DS_MODALFRAME | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "LiberNT Setup"
-FONT 8, "MS Shell Dlg"
+CAPTION "THYFOS Setup"
+FONT 9, "Selawik"
 BEGIN
-    LTEXT "", IDC_FRAME_TITLE, 120, 10, 290, 14, SS_NOPREFIX
-    LTEXT "", IDC_FRAME_SUBTITLE, 120, 26, 290, 18, SS_NOPREFIX
-    LTEXT "", IDC_FRAME_PAGE, 120, 48, 290, 160, NOT WS_VISIBLE
-    CONTROL "", IDC_STATIC, "Static", SS_ETCHEDHORZ, 120, 212, 300, 1
-    PUSHBUTTON "&Back", IDC_FRAME_BACK, 250, 219, 50, 14
-    DEFPUSHBUTTON "&Next", IDC_FRAME_NEXT, 305, 219, 50, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 360, 219, 50, 14
+    LTEXT "", IDC_FRAME_TITLE, 116, 18, 314, 22, SS_NOPREFIX
+    LTEXT "", IDC_FRAME_SUBTITLE, 116, 42, 314, 25, SS_NOPREFIX
+    LTEXT "", IDC_FRAME_PAGE, 116, 74, 314, 160, NOT WS_VISIBLE
+    PUSHBUTTON "&Back", IDC_FRAME_BACK, 256, 250, 50, 20
+    DEFPUSHBUTTON "&Next", IDC_FRAME_NEXT, 312, 250, 50, 20
+    PUSHBUTTON "Cancel", IDCANCEL, 368, 250, 60, 20
 END
 
 IDD_DISKPAGE DIALOGEX 0, 0, 290, 160
@@ -91,8 +90,8 @@ BEGIN
     EDITTEXT IDC_PASSWORDHINT, 100, 74, 190, 13, ES_AUTOHSCROLL | WS_TABSTOP
     LTEXT "&Time zone:", IDC_STATIC, 0, 96, 95, 9
     COMBOBOX IDC_TIMEZONELIST, 100, 94, 190, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    AUTOCHECKBOX "Adjust for &daylight saving time automatically", IDC_AUTODAYLIGHT, 100, 111, 190, 10, WS_TABSTOP
-    LTEXT "This account is a member of the Administrators group. If you leave the password empty, LiberNT signs in to it automatically.", IDC_STATIC, 0, 130, 290, 26
+    AUTOCHECKBOX "Adjust for &daylight saving time", IDC_AUTODAYLIGHT, 100, 111, 190, 10, WS_TABSTOP
+    LTEXT "Create an administrator account. A password is required; you will use it to sign in.", IDC_STATIC, 0, 130, 290, 26
 END
 
 IDD_READYPAGE DIALOGEX 0, 0, 290, 160
@@ -179,7 +178,7 @@ END
 STRINGTABLE
 BEGIN
     IDS_DISKSUBTITLE "Select a partition or unallocated space. Except for Shrink and Extend, Setup changes your disks only after you click Install."
-    IDS_ACCOUNTZONESUBTITLE "You sign in to LiberNT with this account. LiberNT shows the time of the zone you select."
+    IDS_ACCOUNTZONESUBTITLE "Choose your username, password and time zone."
     IDS_READYTITLE "Ready to install"
     IDS_READYSUBTITLE "Review your choices. Setup starts changing your disks when you click Install."
     IDS_DONETITLE "LiberNT is installed"
@@ -244,7 +243,7 @@ BEGIN
     IDS_READY_LANGUAGE "Language and region: %s"
     IDS_READY_KEYBOARD "Keyboard: %s"
     IDS_LANGUAGETITLE "Choose your language and keyboard"
-    IDS_LANGUAGESUBTITLE "Setup and LiberNT use this language, and its format for dates, times, numbers and currency."
+    IDS_LANGUAGESUBTITLE "THYFOS uses this language, and its format for dates, times, numbers and currency."
 END
 
 STRINGTABLE
@@ -259,7 +258,7 @@ END
 STRINGTABLE
 BEGIN
     IDS_OOBE_REGIONTITLE "Choose your language and keyboard"
-    IDS_OOBE_REGIONSUBTITLE "LiberNT uses this language, its format for dates, times, numbers and currency, and this keyboard for typing."
+    IDS_OOBE_REGIONSUBTITLE "THYFOS uses this language, its format for dates, times, numbers and currency, and this keyboard for typing."
     IDS_APPSTITLE "Get the components most programs need"
     IDS_APPSSUBTITLE "LiberNT downloads them from their publishers and installs them for every account."
     IDS_APPS_COL_NAME "Component"

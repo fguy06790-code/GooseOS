@@ -27,6 +27,8 @@ static HWND Tasks[12];
 static int TaskCount, Width, Height;
 static float Scale;
 static BOOL Launcher;
+static float LauncherMotion, LauncherFrom;
+static DWORD LauncherStarted;
 static RECT Dock, LauncherButton, Panel, Input, OpenButton, TaskRects[12], OldWorkArea;
 static RECT AppRows[2];
 static HFONT BodyFont, ClockFont, HeadingFont;
@@ -38,6 +40,23 @@ static HANDLE SetupProcess;
 static DWORD SetupPid;
 static DWORD WindowOpacity=70;
 static const WCHAR OpacityOwner[]=L"THYFOS.WindowOpacity";
+
+static void InitializeMotion()
+{
+    DWORD Initialized=0,Bytes=sizeof(Initialized);
+    RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,L"MotionInitialized",RRF_RT_REG_DWORD,NULL,&Initialized,&Bytes);
+    if (Initialized) return;
+    ANIMATIONINFO Animation={sizeof(Animation)};
+    if (SystemParametersInfoW(SPI_GETANIMATION,sizeof(Animation),&Animation,0) && Animation.iMinAnimate)
+    {
+        const UINT Actions[]={SPI_SETCLIENTAREAANIMATION,SPI_SETMENUANIMATION,SPI_SETMENUFADE,
+            SPI_SETCOMBOBOXANIMATION,SPI_SETTOOLTIPANIMATION,SPI_SETTOOLTIPFADE,SPI_SETLISTBOXSMOOTHSCROLLING};
+        for (UINT Action:Actions) SystemParametersInfoW(Action,0,(PVOID)TRUE,SPIF_UPDATEINIFILE|SPIF_SENDCHANGE);
+    }
+    HKEY Key;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,0,NULL,0,KEY_SET_VALUE,NULL,&Key,NULL)==ERROR_SUCCESS)
+    { Initialized=1; RegSetValueExW(Key,L"MotionInitialized",0,REG_DWORD,(BYTE*)&Initialized,sizeof(Initialized)); RegCloseKey(Key); }
+}
 
 static void ApplyWindowOpacity(HWND W)
 {
@@ -136,6 +155,7 @@ static void Arrange()
     for (int I=0; I<TaskCount; ++I)
         SetRect(&TaskRects[I], Dock.left+S(86+I*54), Dock.top+S(10), Dock.left+S(134+I*54), Dock.bottom-S(10));
     SetRect(&Panel, S(24), max(S(80), Dock.top-S(510)), min(Width-S(24), S(464)), Dock.top-S(16));
+    OffsetRect(&Panel,0,(int)(S(24)*(1.0f-LauncherMotion)));
     SetRect(&Input, Panel.left+S(20), Panel.top+S(24), Panel.right-S(20), Panel.top+S(72));
     SetRect(&OpenButton, Panel.right-S(120), Panel.bottom-S(66), Panel.right-S(20), Panel.bottom-S(24));
     for (int I=0; I<2; ++I)
@@ -282,7 +302,7 @@ static void Render(HDC Dc)
         Gdiplus::SolidBrush Dot(Gdiplus::Color(220,225,241,255));
         G.FillEllipse(&Dot, (float)(TaskRects[I].left+S(22)), (float)(Dock.bottom-S(9)), (float)S(4), (float)S(4));
     }
-    if (Launcher)
+    if (Launcher || LauncherMotion>0)
     {
         Glass(G, Panel, 26);
         Round(G, Input, (float)S(22), 245, RGB(50,71,94));
@@ -328,6 +348,14 @@ static void ConfigureWidgets()
 static void ToggleLauncher()
 {
     Launcher=!Launcher;
+    BOOL Motion=TRUE;
+    ANIMATIONINFO Animation={sizeof(Animation)};
+    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&Motion,0);
+    if (SystemParametersInfoW(SPI_GETANIMATION,sizeof(Animation),&Animation,0) && !Animation.iMinAnimate) Motion=FALSE;
+    LauncherFrom=LauncherMotion; LauncherStarted=GetTickCount();
+    KillTimer(Desktop,4);
+    if (Motion) SetTimer(Desktop,4,16,NULL);
+    else { LauncherMotion=Launcher?1.0f:0.0f; Arrange(); }
     ShowWindow(Search, Launcher?SW_SHOW:SW_HIDE);
     InvalidateRect(Desktop, NULL, FALSE);
     if (Launcher) SetFocus(Search);
@@ -465,7 +493,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             SendMessageW(Search,WM_SETFONT,(WPARAM)BodyFont,FALSE);
             SendMessageW(Search,EM_SETCUEBANNER,TRUE,(LPARAM)L"App, file or folder...");
             OldEditProc=(WNDPROC)SetWindowLongPtrW(Search,GWLP_WNDPROC,(LONG_PTR)EditProc);
-            LoadWallpaper(); RefreshTasks(); ConfigureWidgets();
+            InitializeMotion(); LoadWallpaper(); RefreshTasks(); ConfigureWidgets();
             SystemParametersInfoW(SPI_GETWORKAREA,0,&OldWorkArea,0);
             { RECT Work={0,0,Width,Dock.top-S(8)}; SystemParametersInfoW(SPI_SETWORKAREA,0,&Work,SPIF_SENDCHANGE); }
             ShellMessage=RegisterWindowMessageW(L"SHELLHOOK"); RegisterShellHookWindow(W);
@@ -489,7 +517,16 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
         case WM_ERASEBKGND: return 1;
         case WM_HOTKEY: if (A==1) ToggleLauncher(); return 0;
         case WM_TIMER:
-            if (A==2) { Meters.SampleResources(); InvalidateRect(W,&ResourceCard,FALSE); }
+            if (A==4)
+            {
+                float T=min(1.0f,(GetTickCount()-LauncherStarted)/180.0f);
+                float Ease=T*T*(3.0f-2.0f*T);
+                RECT Dirty=Panel;
+                LauncherMotion=LauncherFrom+((Launcher?1.0f:0.0f)-LauncherFrom)*Ease;
+                Arrange(); UnionRect(&Dirty,&Dirty,&Panel); InvalidateRect(W,&Dirty,FALSE);
+                if (T>=1.0f) KillTimer(W,4);
+            }
+            else if (A==2) { Meters.SampleResources(); InvalidateRect(W,&ResourceCard,FALSE); }
             else if (A==3) { Meters.SampleAudio(); InvalidateRect(W,&AudioCard,FALSE); }
             else { RECT R={Width-S(430),S(10),Width,S(110)}; InvalidateRect(W,&R,FALSE); }
             return 0;
@@ -529,7 +566,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             if (FrameDC)
             { SelectObject(FrameDC,FrameOriginal); DeleteObject(FrameBitmap); DeleteDC(FrameDC); FrameDC=NULL; }
             UnregisterHotKey(W,1);
-            DeregisterShellHookWindow(W); KillTimer(W,1); KillTimer(W,2); KillTimer(W,3); Meters.StopAudio();
+            DeregisterShellHookWindow(W); KillTimer(W,1); KillTimer(W,2); KillTimer(W,3); KillTimer(W,4); Meters.StopAudio();
             delete Backdrop; Backdrop=NULL;
             SystemParametersInfoW(SPI_SETWORKAREA,0,&OldWorkArea,SPIF_SENDCHANGE);
             delete Wallpaper; Wallpaper=NULL;

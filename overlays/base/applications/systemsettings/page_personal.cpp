@@ -42,6 +42,13 @@ static void
 SetEffect(DWORD effect, bool on)
 {
     DwmSettingsWrite(effect, on);
+    if (effect == DWM_EFFECT_ANIMATIONS)
+    {
+        const UINT Actions[]={SPI_SETCLIENTAREAANIMATION,SPI_SETMENUANIMATION,SPI_SETMENUFADE,
+            SPI_SETCOMBOBOXANIMATION,SPI_SETTOOLTIPANIMATION,SPI_SETTOOLTIPFADE,SPI_SETLISTBOXSMOOTHSCROLLING};
+        for (UINT action:Actions)
+            SystemParametersInfoW(action,0,(PVOID)(ULONG_PTR)on,SPIF_UPDATEINIFILE|SPIF_SENDCHANGE);
+    }
     if (effect == DWM_EFFECT_ACRYLIC)
     {
         DwmSettingsWrite(DWM_EFFECT_BLUR, on);

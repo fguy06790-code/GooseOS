@@ -99,6 +99,8 @@ typedef struct _INBV_STATUS_LINE
 } INBV_STATUS_LINE;
 
 static INBV_LOGO_STATE g_Logo;
+static INBV_GOP_RECT g_SplashRect;
+static BOOLEAN g_SplashAnimation;
 static INBV_STATUS_LINE g_Status;
 static LONG    g_LogoTarget;
 static KEVENT  g_LogoStop;
@@ -299,6 +301,8 @@ InbvGopLogoResetState(VOID)
     if (g_Logo.Frame)
         ExFreePoolWithTag(g_Logo.Frame, INBV_LOGO_POOL_TAG);
     RtlZeroMemory(&g_Logo, sizeof(g_Logo));
+    g_SplashAnimation = FALSE;
+    RtlZeroMemory(&g_SplashRect, sizeof(g_SplashRect));
 }
 
 static BOOLEAN
@@ -470,6 +474,31 @@ InbvGopLogoLineRects(
     return Count;
 }
 
+static VOID
+InbvGopSplashRasterize(ULONGLONG Now)
+{
+    ULONG x, y, Head, Radius;
+    INBV_LOGO_STATE *S = &g_Logo;
+    Head = (ULONG)(((Now / 10000) % 1800) * S->Width / 1800);
+    Radius = S->Height / 2;
+    for (y = 0; y < S->Height; ++y)
+    {
+        for (x = 0; x < S->Width; ++x)
+        {
+            ULONG Distance = (x + S->Width - Head) % S->Width;
+            ULONG Band = max(S->Width / 4, 1UL);
+            LONG dx = x < Radius ? (LONG)(Radius - x) : x >= S->Width - Radius ?
+                      (LONG)(x - (S->Width - Radius - 1)) : 0;
+            LONG dy = (LONG)y - (LONG)Radius;
+            ULONG Shade;
+            Distance = min(Distance, S->Width - Distance);
+            Shade = Distance < Band ? 25 + (Band - Distance) * 230 / Band : 25;
+            if (dx * dx + dy * dy > (LONG)(Radius * Radius)) Shade = 0;
+            S->Frame[y * S->Width + x] = S->Lut[Shade];
+        }
+    }
+}
+
 static VOID NTAPI
 InbvGopLogoThread(PVOID Context)
 {
@@ -487,7 +516,12 @@ InbvGopLogoThread(PVOID Context)
     for (;;)
     {
         Now = KeQueryInterruptTime();
-        if (Shown < INBV_LOGO_PROGRESS_MAX)
+        if (g_SplashAnimation)
+        {
+            InbvGopSplashRasterize(Now);
+            if (!InbvGopLogoBlit()) break;
+        }
+        else if (Shown < INBV_LOGO_PROGRESS_MAX)
         {
             Target = (ULONG)ReadNoFence(&g_LogoTarget);
             if (Shown < Target)
@@ -528,7 +562,8 @@ InbvGopLogoThread(PVOID Context)
         }
     }
 
-    InbvGopLogoRasterize(INBV_LOGO_PROGRESS_MAX);
+    if (g_SplashAnimation) InbvGopSplashRasterize(KeQueryInterruptTime());
+    else InbvGopLogoRasterize(INBV_LOGO_PROGRESS_MAX);
     InbvGopLogoBlit();
 
     InbvGopLogoResetState();
@@ -723,6 +758,32 @@ InbvGopLogoStart(
 
     if (!InbvGopLogoSetup(ScreenWidth, ScreenHeight))
         return;
+
+    if (g_SplashRect.Width)
+    {
+        LOADER_PARAMETER_FRAMEBUFFER Info;
+        ULONG i, rs, gs, bs, rm, gm, bm;
+        ExFreePoolWithTag(g_Logo.Frame, INBV_LOGO_POOL_TAG);
+        g_Logo.Frame = NULL;
+        g_Logo.Left = g_SplashRect.X + g_SplashRect.Width * 337 / 1000;
+        g_Logo.Top = g_SplashRect.Y + g_SplashRect.Height * 529 / 1000;
+        g_Logo.Width = max(g_SplashRect.Width * 326 / 1000, 8UL);
+        g_Logo.Height = max(g_SplashRect.Height * 36 / 1000, 4UL);
+        g_Logo.FrameInterval = 400000;
+        if (g_Logo.Left + g_Logo.Width > ScreenWidth || g_Logo.Top + g_Logo.Height > ScreenHeight ||
+            !InbvGopQueryInfo(&Info))
+        { InbvGopLogoResetState(); return; }
+        g_Logo.Frame = ExAllocatePoolWithTag(NonPagedPool,
+            (SIZE_T)g_Logo.Width * g_Logo.Height * sizeof(ULONG), INBV_LOGO_POOL_TAG);
+        if (!g_Logo.Frame) { InbvGopLogoResetState(); return; }
+        rs = InbvMaskShift(Info.RedMask); gs = InbvMaskShift(Info.GreenMask); bs = InbvMaskShift(Info.BlueMask);
+        rm = InbvMaskMax(Info.RedMask >> rs); gm = InbvMaskMax(Info.GreenMask >> gs); bm = InbvMaskMax(Info.BlueMask >> bs);
+        for (i = 0; i < 256; ++i)
+            g_Logo.Lut[i] = InbvPackColor(Info.RedMask, Info.GreenMask, Info.BlueMask,
+                rs, gs, bs, rm, gm, bm, (UCHAR)(238 - i * 100 / 255),
+                (UCHAR)(246 - i * 46 / 255), (UCHAR)255);
+        g_SplashAnimation = TRUE;
+    }
 
     KeInitializeEvent(&g_LogoStop, NotificationEvent, FALSE);
     KeInitializeEvent(&g_LogoDone, NotificationEvent, FALSE);
@@ -1296,6 +1357,12 @@ InbvGopHandleBootBitmap(VOID)
     Splash.Y = (Height - Splash.Height) / 2;
     InbvSolidColorFill(0, 0, Width - 1, Height - 1, BV_COLOR_WHITE);
     WordmarkDrawn = InbvGopDrawWordmark(Width, Height, &Splash);
+
+    if (WordmarkDrawn)
+    {
+        g_SplashRect = Splash;
+        InbvGopLogoStart(Width, Height);
+    }
 
     if (!WordmarkDrawn)
     {
