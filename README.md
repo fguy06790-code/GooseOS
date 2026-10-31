@@ -41,7 +41,7 @@ The GitHub Actions workflow runs the same build and uploads `THYFOS-amd64.iso` a
 
 The simple THYFOS logo replaces the setup watermark, setup icon and legacy setup logo resource. Setup and Driver Updater use THYFOS titles in English. Each Driver Updater scan automatically downloads and installs missing or newer matching Wi-Fi drivers, retaining the existing hardware matching, architecture filtering and trust checks. Bluetooth choices are excluded. An existing internet connection is needed; if networking is unavailable, connect Ethernet or supported USB tethering and scan again. A VM using a virtual wired adapter does not need the host laptop's Wi-Fi driver in the guest.
 
-Compatible standard application windows default to 70% opacity (30% transparent). Settings > Personalization > Window opacity adjusts this from 30% to 100%. The shell leaves app-owned layered windows and windows using private/class drawing DCs unchanged. Desktop wallpaper remains solid.
+Compatible standard application windows default to 85% opacity (15% transparent). Settings > Personalization > Window opacity adjusts this from 30% to 100%. The shell leaves app-owned layered windows and windows using private/class drawing DCs unchanged. Desktop wallpaper remains solid.
 
 Modern setup and motion:
 - Setup uses a larger English layout, Selawik typography, a light blue sidebar, a visible step counter, rounded navigation buttons, and sliding page changes. Account, disk and component logic is preserved.
@@ -49,3 +49,5 @@ Modern setup and motion:
 - The launcher eases in and out over 180 ms. Standard window animations and menu, tooltip, combo-box and smooth-scrolling preferences are enabled for new profiles that have not disabled animations.
 - Settings > Personalization > Animations toggles desktop/setup motion and standard UI animation preferences. The early boot loader is independent of per-user motion preferences.
 - Third-party apps can implement their own rendering and animation behavior.
+
+Liquid-glass setup uses the OS content-backdrop material at 217/255 alpha (about 85% opacity), with rounded-corner preference and a white specular outline. The desktop glass cards and sign-in cards use the same fill alpha. The shell exempts material-backed windows from additional whole-window fading to avoid double blending. Compatible ordinary application windows default to 85% opacity. Existing app-owned transparency remains respected.

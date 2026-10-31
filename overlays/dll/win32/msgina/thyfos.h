@@ -87,7 +87,7 @@ static void ThyfosChrome(HDC Dc, Gdiplus::Graphics &G, const ThyfosLayout &L, fl
     RECT Shadow = L.Panel;
     OffsetRect(&Shadow, 0, (int)(12 * Scale));
     ThyfosRound(G, Shadow, 36 * Scale, 30, RGB(16, 34, 55));
-    ThyfosRound(G, L.Panel, 36 * Scale, 175, RGB(235, 243, 250));
+    ThyfosRound(G, L.Panel, 36 * Scale, 217, RGB(235, 243, 250));
     ThyfosRound(G, L.Panel, 36 * Scale, 235, RGB(255, 255, 255), TRUE);
     ThyfosDots(G, L.Panel, Scale);
     ThyfosText(Dc, HeadingFont, L"Log In", L.Heading, Ink, DT_LEFT);
@@ -100,7 +100,7 @@ static void ThyfosChrome(HDC Dc, Gdiplus::Graphics &G, const ThyfosLayout &L, fl
     ThyfosText(Dc, BodyFont, Busy ? L"Signing in..." : L"Log In", L.Submit, RGB(255, 255, 255), DT_CENTER);
     if (L.Wave.bottom > L.Wave.top + 40 * Scale)
     {
-        ThyfosRound(G, L.Wave, 36 * Scale, 155, RGB(236, 244, 252));
+        ThyfosRound(G, L.Wave, 36 * Scale, 217, RGB(236, 244, 252));
         ThyfosRound(G, L.Wave, 36 * Scale, 235, RGB(255, 255, 255), TRUE);
         ThyfosDots(G, L.Wave, Scale);
         int Mid = L.Wave.top + (L.Wave.bottom - L.Wave.top) * 3 / 5;

@@ -14,6 +14,7 @@
 #include <shellframe.h>
 #include "widgets.h"
 #include "preferences.h"
+#include <reactos/dwmframe.h>
 
 static DesktopMeters Meters;
 static BOOL AudioWidget=TRUE, ResourceWidget=TRUE;
@@ -38,7 +39,7 @@ static WCHAR WallpaperPath[MAX_PATH];
 static UINT ShellMessage;
 static HANDLE SetupProcess;
 static DWORD SetupPid;
-static DWORD WindowOpacity=70;
+static DWORD WindowOpacity=85;
 static const WCHAR OpacityOwner[]=L"THYFOS.WindowOpacity";
 
 static void InitializeMotion()
@@ -62,7 +63,7 @@ static void ApplyWindowOpacity(HWND W)
 {
     LONG_PTR Style=GetWindowLongPtrW(W,GWL_EXSTYLE);
     BOOL Owned=GetPropW(W,OpacityOwner)!=NULL;
-    if (WindowOpacity==100)
+    if (WindowOpacity==100 || GetPropW(W,DWM_PROP_CONTENT_BACKDROP))
     {
         if (Owned)
         {
@@ -179,8 +180,7 @@ static void RefreshTasks()
 
 static void Glass(Gdiplus::Graphics &G, const RECT &R, int Radius)
 {
-    Round(G, R, (float)S(Radius), 145, RGB(22,42,64));
-    Round(G, R, (float)S(Radius), 42, RGB(210,230,249));
+    Round(G, R, (float)S(Radius), 217, RGB(42,64,88));
     Round(G, R, (float)S(Radius), 95, RGB(237,247,255), TRUE);
 }
 
@@ -330,9 +330,9 @@ static void Render(HDC Dc)
 static void ConfigureWidgets()
 {
     DWORD Value=1,Bytes=sizeof(Value);
-    DWORD Opacity=70,OpacityBytes=sizeof(Opacity);
+    DWORD Opacity=85,OpacityBytes=sizeof(Opacity);
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_WINDOW_OPACITY,RRF_RT_REG_DWORD,NULL,&Opacity,&OpacityBytes);
-    WindowOpacity=Opacity>=30 && Opacity<=100?Opacity:70;
+    WindowOpacity=Opacity>=30 && Opacity<=100?Opacity:85;
     RefreshTasks();
     RegGetValueW(HKEY_CURRENT_USER,THYFOS_DESKTOP_KEY,THYFOS_AUDIO_WIDGET,RRF_RT_REG_DWORD,NULL,&Value,&Bytes);
     AudioWidget=Value!=0; Value=1; Bytes=sizeof(Value);

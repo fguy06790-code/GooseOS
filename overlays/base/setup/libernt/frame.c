@@ -9,6 +9,7 @@
 #include "libernt.h"
 
 #include "resource.h"
+#include <reactos/dwmsettings.h>
 
 #define NDEBUG
 #include <debug.h>
@@ -437,6 +438,13 @@ FramePaintColumn(
 
     GetClientRect(hwnd, &rc);
     FillRect(hdc, &rc, Frame.Background);
+    {
+        HGDIOBJ OldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
+        HPEN Pen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+        HGDIOBJ OldPen = SelectObject(hdc, Pen);
+        RoundRect(hdc, Frame.Watermark.cx + 12, 12, rc.right - 12, rc.bottom - 70, 24, 24);
+        SelectObject(hdc, OldPen); SelectObject(hdc, OldBrush); DeleteObject(Pen);
+    }
     rc.right = Frame.Watermark.cx;
     FillRect(hdc, &rc, Frame.Sidebar);
 
@@ -543,6 +551,14 @@ SetupFrameProc(
             Margins.cxLeftWidth = 0;
             Margins.cyTopHeight = 0;
             DwmExtendFrameIntoClientArea(hwnd, &Margins);
+            {
+                DWORD Corner = 2;
+                DWORD Backdrop = DWMSBT_TRANSIENTWINDOW;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &Corner, sizeof(Corner));
+                DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &Backdrop, sizeof(Backdrop));
+                DwmSettingsSetContentBackdrop(hwnd, RGB(239, 245, 252), 217);
+                SetPropW(hwnd, DWM_PROP_BACKDROP_COLORIZATION, (HANDLE)(ULONG_PTR)(RGB(221, 234, 248) + 1));
+            }
 
             GetWindowRect(GetDlgItem(hwnd, IDC_FRAME_PAGE), &rc);
             MapWindowPoints(HWND_DESKTOP, hwnd, (LPPOINT)&rc, 2);
@@ -609,6 +625,7 @@ SetupFrameProc(
             break;
 
         case WM_DESTROY:
+            DwmSettingsClearContentBackdrop(hwnd);
             DeleteObject(Frame.Background); DeleteObject(Frame.Sidebar); DeleteObject(Frame.BodyFont);
             if (Frame.SetupData->hTitleFont)
                 DeleteObject(Frame.SetupData->hTitleFont);
