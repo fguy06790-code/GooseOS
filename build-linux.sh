@@ -29,6 +29,7 @@ if [ ! -f "$TOOLCHAIN_ROOT/rosbe-env.sh" ]; then
     INSTALL_ROOT="$TOOLCHAIN_ROOT" BIN_DIR="$WORK_ROOT/bin" sh "$WORK_ROOT/rosbe-bootstrap.sh"
 fi
 python3 "$CONFIG_DIR/prepare-custom.py" "$SOURCE_DIR" "$CONFIG_DIR"
+python3 "$CONFIG_DIR/prepare-wifi.py" "$SOURCE_DIR" "$CONFIG_DIR"
 export PATH="$TOOLCHAIN_ROOT/mingw-gcc/x86_64-w64-mingw32/bin:$TOOLCHAIN_ROOT/mingw-gcc/i686-w64-mingw32/bin:$PATH"
 export CCACHE_DISABLE=1
 export REACTOS_NESTED_BUILD_MIRROR=1

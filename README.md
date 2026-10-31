@@ -65,3 +65,13 @@ Rounded corners and Settings launch:
 - Personalization exposes a Rounded window corners toggle. Restore desktop defaults enables it.
 - Settings launch resolves the actual installed path under %SystemRoot%\ImmersiveControlPanel, fixing the previous missing-app error from shell shortcuts and aliases.
 - The launcher temporarily raises the desktop while open, so it can receive focus over an existing app; it lowers when dismissed or deactivated.
+
+Bundled Intel Wi-Fi package:
+- The amd64 ISO includes the exact Intel WiFi-24.80.0-Driver64-Win10-Win11.exe supplied by the user, under Windows\DriverSetup. The unchanged package keeps its Intel signature and notices.
+- During first-boot setup, before online driver scans and Chrome downloads, setup checks for an Intel PCI wireless controller. If one is present, it verifies the pinned installer hash and attempts silent installation once, with Intel's documented -q -s switches and a log in Windows\DriverSetup\IntelWiFi-24.80.log.
+- The attempt, installer result and reboot-required status are recorded under HKLM\SOFTWARE\THYFOS\Setup\IntelWiFi24.80. An installation attempt is marked before launching, so a restart or failure does not create an automatic reinstall loop. Installer failures are reported, and the package remains available for manual retry. Installation success does not establish that a driver has bound to hardware.
+- VirtualBox's Intel PRO/1000 is a wired adapter. It is excluded; the VM uses its virtual Ethernet driver and Windows continues managing the host's physical Wi-Fi.
+- Builders download the pinned package directly from Intel and verify SHA-256 and SHA-512. The EXE is not committed to GitHub. On Linux, set WIFI_INSTALLER to an existing copy to build without downloading it. On Windows use .\build-local.ps1 -WifiInstaller 'C:\path\WiFi-24.80.0-Driver64-Win10-Win11.exe'.
+- This Intel package targets Windows 10/11. Actual installation and hardware operation on LiberNT/THYFOS are unverified.
+- Package details: https://www.intel.com/content/www/us/en/download/19351/intel-wireless-wi-fi-drivers-for-windows-10-and-windows-11.html
+- Silent installation reference: https://www.intel.com/content/www/us/en/support/articles/000055825/wireless.html

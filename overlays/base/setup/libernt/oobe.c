@@ -625,6 +625,7 @@ FinishThread(
     HRESULT hrCom;
     DWORD Error;
     ULONG Index;
+    DWORD WifiError;
 
     SetSetupLanguage(pSetupData->DefaultLanguage);
     if (ComponentsOnly)
@@ -662,8 +663,16 @@ FinishThread(
 
 Components:
     PostMessageW(Context->hwndDlg, PM_APPLY_DONE, 0, 0);
-    InstallMissingDrivers(&Context->Progress);
     hrCom = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    WifiError=InstallBundledWifi(&Context->Progress);
+    if (WifiError!=ERROR_SUCCESS)
+    {
+        WCHAR Text[512];
+        StringCchPrintfW(Text,ARRAYSIZE(Text),L"The bundled Intel Wi-Fi installer did not complete (error %lu). "
+            L"Inspect the package and installation log in the Windows DriverSetup folder. You can retry the installer manually.",WifiError);
+        SetupMessage(GetParent(Context->hwndDlg),TD_WARNING_ICON,TDCBF_OK_BUTTON,IDOK,L"Intel Wi-Fi setup",Text);
+    }
+    if (WifiError!=ERROR_TIMEOUT) InstallMissingDrivers(&Context->Progress);
     for (Index = 0; Index < OobeAppCount; Index++)
     {
         if (OobeApps[Index].Selected)
