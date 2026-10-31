@@ -31,7 +31,7 @@ static BOOL Launcher;
 static float LauncherMotion, LauncherFrom;
 static DWORD LauncherStarted;
 static RECT Dock, LauncherButton, Panel, Input, OpenButton, TaskRects[12], OldWorkArea;
-static RECT AppRows[3];
+static RECT AppRows[4];
 static int ActiveApp=-1;
 static HFONT BodyFont, ClockFont, HeadingFont;
 static HBRUSH EditBrush;
@@ -188,8 +188,10 @@ static void Arrange()
     OffsetRect(&Panel,0,(int)(S(24)*(1.0f-LauncherMotion)));
     SetRect(&Input, Panel.left+S(20), Panel.top+S(24), Panel.right-S(20), Panel.top+S(72));
     SetRect(&OpenButton, Panel.right-S(120), Panel.bottom-S(66), Panel.right-S(20), Panel.bottom-S(24));
+    int RowTop=Input.bottom+S(82);
+    int RowStep=min(S(62),(OpenButton.top-S(12)-RowTop)/(int)_countof(AppRows));
     for (int I=0; I<(int)_countof(AppRows); ++I)
-        SetRect(&AppRows[I],Panel.left+S(20),Input.bottom+S(100+I*78),Panel.right-S(20),Input.bottom+S(168+I*78));
+        SetRect(&AppRows[I],Panel.left+S(20),RowTop+I*RowStep,Panel.right-S(20),RowTop+(I+1)*RowStep-S(8));
     int CardWidth=min(S(420),Width-S(48));
     SetRect(&ResourceCard,Width-S(24)-CardWidth,Dock.top-S(174),Width-S(24),Dock.top-S(18));
     int AudioBottom=ResourceWidget?ResourceCard.top-S(14):Dock.top-S(18);
@@ -341,13 +343,14 @@ static void Render(HDC Dc)
         RECT Heading={Panel.left+S(28), Input.bottom+S(30), Panel.right-S(28), Input.bottom+S(72)};
         Label(Dc, HeadingFont, L"Launcher", Heading);
         WCHAR ChromePath[MAX_PATH];
-        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer",L"Settings"};
-        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular",L"settings_20_regular"};
+        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer",L"Settings",L"THYFOS Store"};
+        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular",L"settings_20_regular",L"apps_20_regular"};
         for (int I=0; I<(int)_countof(AppRows); ++I)
         {
             Round(G,AppRows[I],(float)S(16),I==ActiveApp?85:35,RGB(218,237,255));
+            int IconSize=min(S(30),AppRows[I].bottom-AppRows[I].top-S(6));
             ShellFrame::FillIcon(G,Icons[I],Gdiplus::RectF((float)(AppRows[I].left+S(16)),
-                (float)(AppRows[I].top+S(19)),(float)S(30),(float)S(30)),RGB(228,241,255));
+                (float)(AppRows[I].top+(AppRows[I].bottom-AppRows[I].top-IconSize)/2),(float)IconSize,(float)IconSize),RGB(228,241,255));
             G.Flush(Gdiplus::FlushIntentionSync);
             RECT Name=AppRows[I]; Name.left+=S(64);
             Label(Dc,BodyFont,Names[I],Name);
@@ -472,6 +475,7 @@ static void OpenCommand()
     if (!lstrcmpiW(Command,L"settings") || !lstrcmpiW(Command,L"systemsettings") ||
         !lstrcmpiW(Command,L"systemsettings.exe")) { OpenSettings(); return; }
     if (!lstrcmpiW(Command,L"explorer") || !lstrcmpiW(Command,L"file explorer")) { OpenProgram(L"filebrowser.exe"); return; }
+    if (!lstrcmpiW(Command,L"store") || !lstrcmpiW(Command,L"thyfos store")) { OpenProgram(L"thyfos-store.exe"); return; }
     StringCchCopyW(File, _countof(File), Command);
     Args[0]=0;
     if (!PathFileExistsW(Command))
@@ -489,13 +493,15 @@ static void OpenLauncherApp(int Index)
     if (Index==0) OpenChrome();
     else if (Index==1) OpenProgram(L"filebrowser.exe");
     else if (Index==2) OpenSettings();
+    else if (Index==3) OpenProgram(L"thyfos-store.exe");
 }
 
 static LRESULT CALLBACK EditProc(HWND W, UINT M, WPARAM A, LPARAM B)
 {
     if (M==WM_KEYDOWN && (A==VK_UP || A==VK_DOWN))
     {
-        ActiveApp=A==VK_DOWN?(ActiveApp+1)%3:(ActiveApp<0?2:(ActiveApp+2)%3);
+        const int Count=(int)_countof(AppRows);
+        ActiveApp=A==VK_DOWN?(ActiveApp+1)%Count:(ActiveApp<0?Count-1:(ActiveApp+Count-1)%Count);
         InvalidateRect(Desktop,&Panel,FALSE); return 0;
     }
     if (M==WM_KEYDOWN && A==VK_RETURN)
@@ -519,6 +525,7 @@ static void ContextMenu(POINT P)
     AppendMenuW(Menu,MF_STRING,2,L"Files");
     AppendMenuW(Menu,MF_STRING,5,L"Google Chrome");
     AppendMenuW(Menu,MF_STRING,3,L"Settings");
+    AppendMenuW(Menu,MF_STRING,6,L"THYFOS Store");
     AppendMenuW(Menu,MF_SEPARATOR,0,NULL);
     AppendMenuW(Menu,MF_STRING,4,L"Sign out");
     int Id=TrackPopupMenu(Menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,P.x,P.y,0,Desktop,NULL);
@@ -528,6 +535,7 @@ static void ContextMenu(POINT P)
     if (Id==3) OpenSettings();
     if (Id==4) ExitWindowsEx(EWX_LOGOFF,0);
     if (Id==5) OpenChrome();
+    if (Id==6) OpenProgram(L"thyfos-store.exe");
 }
 
 static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
@@ -611,6 +619,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             else if (Launcher && PtInRect(&AppRows[0],P)) OpenChrome();
             else if (Launcher && PtInRect(&AppRows[1],P)) OpenProgram(L"filebrowser.exe");
             else if (Launcher && PtInRect(&AppRows[2],P)) OpenSettings();
+            else if (Launcher && PtInRect(&AppRows[3],P)) OpenProgram(L"thyfos-store.exe");
             else
             {
                 for (int I=0;I<TaskCount;++I) if (PtInRect(&TaskRects[I],P))

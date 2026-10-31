@@ -83,6 +83,8 @@ BuildHome(PageBuilder &page)
     page.Navigate(L"Accounts & sign-in", L"Manage users, passwords and sign-in options.", L"person_20_regular", PageId::Accounts);
     page.Navigate(L"About this PC", L"System information and computer name.", L"info_20_regular", PageId::About);
     page.Group(L"Tools");
+    page.Button(L"THYFOS Store", L"Find and install apps from the WinGet community catalog.", L"apps_20_regular", L"Open",
+        [](int) { Launch(L"thyfos-store.exe"); });
     page.Button(L"Task Manager", L"Inspect running processes and hardware usage.", L"desktop_20_regular", L"Open",
         [](int) { Launch(L"taskmgr11.exe"); });
 }

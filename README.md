@@ -80,3 +80,21 @@ Bundled Intel Wi-Fi package:
 
 Initial release: see RELEASE_NOTES.md for downloads, features and known issues. VERSION identifies the THYFOS product release; it does not change the base NT compatibility version. The ISO includes release.json and displays the version in setup and Settings.
 
+## THYFOS Store and package manager
+
+The next build adds THYFOS Store to the launcher, desktop context menu, Settings Home and Settings > Apps. Type `store` or `thyfos store` in the launcher, or run `thyfos-store.exe`. The graphical app shares the existing `lntget` backend: search by name or category, inspect publisher/version/installer details, download, install, refresh the catalog, and open installed-app management. It checks the community source signature and block map and verifies installer SHA-256 before execution.
+
+THYFOS Store is an independent frontend for the WinGet community repository. It does not provide the official Microsoft Store, Microsoft accounts, purchases, DRM, or Microsoft Store-only packages. Catalog listings do not guarantee THYFOS compatibility. Installers retain their own licenses and may need elevation or a restart. A successful installer exit does not prove the application works.
+
+From a command prompt:
+
+```bat
+lntget search --id 7zip.7zip -e
+lntget show --id 7zip.7zip -e
+lntget download --id 7zip.7zip -e --architecture x64
+lntget install --id 7zip.7zip -e --interactive
+lntget source update
+```
+
+Open Settings > Apps > Installed apps to uninstall software. This feature is newer than the published v1.0.0 ISO; rebuilding `main` includes it.
+

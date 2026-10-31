@@ -28,7 +28,19 @@ int wmain()
     if (LaunchCount!=3 || lstrcmpiW(CapturedPath,Expected)) return 4;
     SetWindowTextW(Search,L"systemsettings.exe"); OpenCommand();
     if (LaunchCount!=4 || lstrcmpiW(CapturedPath,Expected)) return 5;
+    OpenLauncherApp(3);
+    if (LaunchCount!=5 || lstrcmpiW(CapturedPath,L"thyfos-store.exe")) return 6;
+    SetWindowTextW(Search,L"store"); OpenCommand();
+    if (LaunchCount!=6 || lstrcmpiW(CapturedPath,L"thyfos-store.exe")) return 7;
+    SetWindowTextW(Search,L"thyfos store"); OpenCommand();
+    if (LaunchCount!=7 || lstrcmpiW(CapturedPath,L"thyfos-store.exe")) return 8;
+    ActiveApp=2; EditProc(Search,WM_KEYDOWN,VK_DOWN,0);
+    if (ActiveApp!=3) return 9;
+    EditProc(Search,WM_KEYDOWN,VK_DOWN,0);
+    if (ActiveApp!=0) return 10;
+    EditProc(Search,WM_KEYDOWN,VK_UP,0);
+    if (ActiveApp!=3) return 11;
     DestroyWindow(Search); Search=NULL;
-    puts("Settings action, launcher row and aliases resolve the installed Settings path; no app launched");
+    puts("Settings and Store launcher actions, aliases and four-row keyboard navigation passed; no app launched");
     return 0;
 }
