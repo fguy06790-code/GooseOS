@@ -1,0 +1,111 @@
+name: Build Super-Lightweight LiberNT with Cairo Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-superlight-iso:
+    name: Compile Super-Lightweight LiberNT ISO
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Custom Configurations
+        uses: actions/checkout@v4
+
+      - name: Clone LiberNT Source Code
+        run: |
+          git clone --depth 1 https://github.com/LiberNT/LiberNT.git D:\LiberNT
+
+      - name: Setup ReactOS / LiberNT Toolchain (RosBE)
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/reactos/RosBE-Windows/2.2.1/RosBE-2.2.1.exe" -OutFile "RosBE-Setup.exe"
+          Start-Process -FilePath ".\RosBE-Setup.exe" -ArgumentList "/S", "/D=C:\RosBE" -Wait
+          Write-Host "RosBE installed."
+
+      - name: Download & Aggressively Strip Cairo Desktop
+        shell: powershell
+        run: |
+          $cairoUrl = (Invoke-RestMethod -Uri "https://api.github.com/repos/cairoshell/cairoshell/releases/latest").assets | Where-Object { $_.name -like "*64*.zip" } | Select-Object -First 1 -ExpandProperty browser_download_url
+          Write-Host "Downloading Cairo from $cairoUrl"
+          Invoke-WebRequest -Uri $cairoUrl -OutFile "cairo.zip"
+          Expand-Archive -Path "cairo.zip" -DestinationPath "D:\LiberNT\modules\cairo\files"
+
+          # 1. Delete all non-English language folders (saves ~25MB and prevents satellite assembly loading)
+          Get-ChildItem -Path "D:\LiberNT\modules\cairo\files" -Directory | Where-Object { $_.Name.Length -eq 2 -or $_.Name -like "*-*" } | Remove-Item -Recurse -Force
+
+          # 2. Delete all debug symbols, XML documentation, and unused assets
+          Get-ChildItem -Path "D:\LiberNT\modules\cairo\files" -Include *.pdb, *.xml, *.md, *.txt -Recurse | Remove-Item -Force
+
+          # 3. Inject our ultra-lightweight CairoSettings.xml
+          Copy-Item "CairoSettings.xml" -Destination "D:\LiberNT\modules\cairo\files\CairoSettings.xml" -Force
+
+          # 4. Generate CMake definition for Cairo
+          $cmakeContent = @"
+          file(GLOB_RECURSE CAIRO_BINARIES "files/*.*")
+          foreach(ITEM `${CAIRO_BINARIES})
+              file(RELATIVE_PATH REL_PATH "`${CMAKE_CURRENT_SOURCE_DIR}/files" `${ITEM})
+              get_filename_component(REL_DIR `${REL_PATH} DIRECTORY)
+              add_cd_file(FILE `${ITEM} TARGET bootcd DESTINATION "reactos/CairoDesktop/`${REL_DIR}" FOR all)
+          endforeach()
+          "@
+          Set-Content -Path "D:\LiberNT\modules\cairo\CMakeLists.txt" -Value $cmakeContent
+
+      - name: Inject Custom Boot Logo & Ultra-Lightweight System Tweaks
+        shell: powershell
+        run: |
+          # 1. Inject custom boot logo bitmap
+          Copy-Item "custom-bootlogo.bmp" -Destination "D:\LiberNT\ntoskrnl\inbv\logo\1.bmp" -Force
+          Copy-Item "custom-bootlogo.bmp" -Destination "D:\LiberNT\ntoskrnl\inbv\logo\5.bmp" -Force -ErrorAction SilentlyContinue
+
+          # 2. Patch hivesft.inf (Default shell -> Cairo Desktop)
+          $hivesft = Get-ChildItem -Path "D:\LiberNT" -Filter "hivesft.inf" -Recurse | Select-Object -First 1
+          (Get-Content $hivesft.FullName) -replace '"explorer.exe"', '"%SystemRoot%\CairoDesktop\CairoDesktop.exe"' | Set-Content $hivesft.FullName
+
+          # 3. Patch hivesys.inf: Aggressive Service Stripping & Memory Tuning
+          $hivesys = Get-ChildItem -Path "D:\LiberNT" -Filter "hivesys.inf" -Recurse | Select-Object -First 1
+          $sysContent = Get-Content $hivesys.FullName
+
+          # Disable Print Spooler
+          $sysContent = $sysContent -replace '("Spooler","Start",0x00010001,)0x00000002', '$10x00000004'
+          # Disable Themes Engine (eliminates GDI/D3D composition buffers)
+          $sysContent = $sysContent -replace '("Themes","Start",0x00010001,)0x00000002', '$10x00000004'
+          # Disable RemoteRegistry
+          $sysContent = $sysContent -replace '("RemoteRegistry","Start",0x00010001,)0x00000002', '$10x00000004'
+          # Disable Error Reporting Debugger
+          $sysContent = $sysContent -replace '("Dbgk","Start",0x00010001,)0x00000002', '$10x00000004'
+
+          # Append NT Memory Manager Performance Optimization Tweaks
+          $memTweaks = @"
+          ; Ultra-Lightweight Memory Manager Tweaks
+          HKLM,"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management","ClearPageFileAtShutdown",0x00010001,0x00000000
+          HKLM,"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management","DisablePagingExecutive",0x00010001,0x00000000
+          HKLM,"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management","LargeSystemCache",0x00010001,0x00000000
+          HKLM,"SYSTEM\CurrentControlSet\Control\FileSystem","NtfsDisableLastAccessUpdate",0x00010001,0x00000001
+          "@
+          $sysContent += "`n" + $memTweaks
+          Set-Content -Path $hivesys.FullName -Value $sysContent
+
+      - name: Compile Ultra-Lightweight LiberNT ISO (MinSizeRel + Stripped)
+        shell: cmd
+        run: |
+          call "C:\RosBE\RosBE.cmd"
+          cd /d D:\LiberNT
+          :: Configure for minimum size and maximum CPU cache efficiency
+          cmake -G "Ninja" -DARCH=amd64 -DCMAKE_BUILD_TYPE=MinSizeRel -DOPTIMIZE=1 -DENABLE_ROS_DEBUG=OFF -S . -B build
+          cd build
+          ninja bootcd
+
+          :: Strip debug symbols from all compiled binaries before ISO packaging
+          for /R %%F in (*.exe *.dll *.sys) do (
+              strip --strip-all "%%F" 2>nul
+          )
+
+      - name: Upload Super-Lightweight Bootable ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiberNT-SuperLight-Cairo-ISO
+          path: D:\LiberNT\build\bootcd.iso
+          retention-days: 7

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CairoSettings>
+  <!-- ULTRA-LIGHTWEIGHT PERFORMANCE OVERRIDES -->
+
+  <!-- 1. Graphics & Rendering: Zero GPU Overhead -->
+  <EnableBlur>false</EnableBlur>
+  <EnableShadows>false</EnableShadows>
+  <EnableAnimations>false</EnableAnimations>
+  <EnableTransparency>false</EnableTransparency>
+  <EnableGlass>false</EnableGlass>
+  <TaskbarThumbnails>false</TaskbarThumbnails>
+  <TaskbarGroupingStyle>0</TaskbarGroupingStyle>
+  <EnableMenuBarShadow>false</EnableMenuBarShadow>
+  <EnableTaskbarBadges>false</EnableTaskbarBadges>
+
+  <!-- 2. Memory & Disk I/O: Zero Background Polling -->
+  <EnableDesktopFolderWatcher>false</EnableDesktopFolderWatcher>
+  <ShowDesktopIcons>false</ShowDesktopIcons>
+  <EnableDynamicAppIndexing>false</EnableDynamicAppIndexing>
+  <EnableSearchIndexer>false</EnableSearchIndexer>
+  <AutoCheckForUpdates>false</AutoCheckForUpdates>
+  <SendTelemetry>false</SendTelemetry>
+
+  <!-- 3. Minimal Shell UI -->
+  <EnableMenuBar>true</EnableMenuBar>
+  <EnableTaskbar>true</EnableTaskbar>
+  <ShowClock>true</ShowClock>
+  <ShowVolumeControl>false</ShowVolumeControl>
+  <ShowActionCenter>false</ShowActionCenter>
+  <PinnedProgramsPinnedToTaskbar>true</PinnedProgramsPinnedToTaskbar>
+</CairoSettings>
