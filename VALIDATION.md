@@ -17,3 +17,5 @@ Not established: completed account/password setup, authentication after setup, C
 This ISO targets amd64/x86-64 PCs. ARM, phones, consoles, Apple Silicon and other CPU architectures cannot run it natively. Firmware, storage, networking, graphics and audio each require supported hardware and compatible drivers. A virtual machine with emulated supported hardware is the most practical way to try it on a different host architecture; that does not guarantee compatibility or performance.
 
 File Explorer caption update: removed the application-name suffix and the initial application-name caption. Folder titles remain. The changed explorerframe component and ISO were rebuilt; this caption update has not had a separate VM check.
+
+THYFOS logo and automatic Wi-Fi update changes: compiled into the ISO. Actual Wi-Fi package download/install and the revised setup artwork have not been verified in a guest. The already-running VirtualBox VM remains on its previous installed version.

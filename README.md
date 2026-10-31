@@ -38,3 +38,5 @@ WORK_ROOT=/path/to/writable/work sh build-linux.sh
 `BUILD_JOBS` defaults to 6; lower it for limited memory. `SOURCE_DIR`, `TOOLCHAIN_ROOT` and `OUTPUT_DIR` override working directories. Use a fresh source directory for a clean build. RosBE comes from LiberNT's official toolchain bootstrap. Compiler caches are disabled.
 
 The GitHub Actions workflow runs the same build and uploads `THYFOS-amd64.iso` and `SHA256SUMS` as `THYFOS-amd64-ISO`. ISO binaries and downloaded Chrome installers are not committed.
+
+The simple THYFOS logo replaces the setup watermark, setup icon and legacy setup logo resource. Setup and Driver Updater use THYFOS titles in English. Each Driver Updater scan automatically downloads and installs missing or newer matching Wi-Fi drivers, retaining the existing hardware matching, architecture filtering and trust checks. Bluetooth choices are excluded. An existing internet connection is needed; if networking is unavailable, connect Ethernet or supported USB tethering and scan again. A VM using a virtual wired adapter does not need the host laptop's Wi-Fi driver in the guest.

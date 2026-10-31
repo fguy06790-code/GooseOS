@@ -160,7 +160,7 @@ BEGIN
     IDS_EXTEND_BUTTON "E&xtend"
     IDS_RESIZE_PENDING "Partition changes are waiting to be applied. Shrink and extend take effect immediately, so do them before creating, deleting or formatting partitions."
     IDS_RESIZE_FAILED "The partition could not be resized."
-    IDS_CAPTION "LiberNT Setup"
+    IDS_CAPTION "THYFOS Setup"
     IDS_DRIVETITLE "Where do you want to install LiberNT?"
     IDS_PROCESSTITLE "Installing LiberNT"
     IDS_PROCESSSUBTITLE "Setup prepares the disk, copies the files, configures LiberNT and installs the bootloader. This can take a few minutes."

@@ -97,6 +97,23 @@ struct Choice
     ChoiceState State;
 };
 
+static bool IsWifiChoice(const Choice &choice)
+{
+    std::wstring name=choice.Device.Name+L" "+choice.Update.Title;
+    std::transform(name.begin(),name.end(),name.begin(),towlower);
+    if (name.find(L"bluetooth")!=std::wstring::npos ||
+        (!_wcsicmp(choice.Device.Class.c_str(),L"MEDIA"))) return false;
+    if (name.find(L"wi-fi")!=std::wstring::npos || name.find(L"wifi")!=std::wstring::npos ||
+        name.find(L"wireless")!=std::wstring::npos || name.find(L"wlan")!=std::wstring::npos ||
+        name.find(L"802.11")!=std::wstring::npos) return true;
+    for (std::wstring id:choice.Device.CompatibleIds)
+    {
+        std::transform(id.begin(),id.end(),id.begin(),towupper);
+        if (id.find(L"PCI\\CC_0280")==0) return true;
+    }
+    return false;
+}
+
 struct Outcome
 {
     std::wstring Device;
@@ -863,12 +880,16 @@ private:
                     InvalidateRect(GetDlgItem(m_Pages[PageDevices], IDC_DEVICES), NULL, FALSE);
                     UpdateScanStatus();
                     UpdateButtons();
-                    if (m_FirstBoot)
+                    if (m_FirstBoot || m_AutoWifi)
                     {
+                        bool firstBoot=m_FirstBoot;
                         m_FirstBoot = false;
+                        m_AutoWifi = false;
                         std::vector<Choice> missing;
                         for (const auto &entry : m_Found)
-                            if (entry.second.State == ChoiceState::Missing)
+                            if ((firstBoot && entry.second.State == ChoiceState::Missing) ||
+                                (IsWifiChoice(entry.second) &&
+                                 (entry.second.State == ChoiceState::Missing || entry.second.State == ChoiceState::Newer)))
                                 missing.push_back(entry.second);
                         if (!missing.empty())
                             StartInstall(missing);
@@ -1387,11 +1408,14 @@ private:
             text = FormatText(IDS_SCAN_FOUND, NumberText(m_Found.size()));
         else
             text = LoadText(IDS_SCAN_NONE);
+        if (!m_Scanning && (m_ScanError || m_Found.empty()))
+            text += L" Wi-Fi drivers require internet access. Connect Ethernet or supported USB tethering, then scan again.";
         SetDlgItemTextW(m_Pages[PageDevices], IDC_DEVICES_STATUS, text.c_str());
     }
 
     void StartScan()
     {
+        m_AutoWifi = true;
         std::vector<DeviceInfo> devices = m_Devices;
         HWND hwnd = m_hwnd;
         UINT scan = ++m_Scan;
@@ -1656,6 +1680,7 @@ private:
     CancelFlag *m_ScanCancel = new CancelFlag;
     UINT m_Scan = 0;
     bool m_FirstBoot = false;
+    bool m_AutoWifi = true;
     bool m_Scanning = false;
     size_t m_Scanned = 0;
     size_t m_ScanTotal = 0;
