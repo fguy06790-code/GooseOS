@@ -14,6 +14,9 @@ int wmain()
     if (ThyfosIntelWifiIds(Ethernet,WiredClass)) return 2;
     if (ThyfosIntelWifiIds(Bluetooth,Wlan) || ThyfosIntelWifiIds(Realtek,Wlan)) return 3;
     if (ThyfosIntelWifiIds(L"",Wlan) || ThyfosIntelWifiIds(Wifi,L"")) return 4;
+    if (!ThyfosAsusUsbWifiIds(Realtek) || !ThyfosAsusUsbWifiIds(L"usb\\vid_0b05&pid_184c&rev_0216\0")) return 5;
+    if (ThyfosAsusUsbWifiIds(Bluetooth) || ThyfosAsusUsbWifiIds(Ethernet) ||
+        ThyfosAsusUsbWifiIds(L"USB\\VID_0B05&PID_184C0\0") || ThyfosAsusUsbWifiIds(L"")) return 6;
     puts("Intel wireless matching passed; virtual Ethernet, Bluetooth, other vendors and empty IDs excluded");
     return 0;
 }

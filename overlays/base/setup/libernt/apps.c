@@ -22,6 +22,9 @@
 #include "resource.h"
 #include "wifi-policy.h"
 #include "thyfos-wifi.h"
+#include "thyfos-usbwifi.h"
+#include <newdev.h>
+#include "wifi-service.h"
 
 #define NDEBUG
 #include <debug.h>
@@ -699,6 +702,65 @@ static BOOL IntelWifiPresent(VOID)
     }
     SetupDiDestroyDeviceInfoList(Set);
     return Found;
+}
+
+DWORD EnsureWifiService(VOID)
+{
+    return ThyfosStartWifiService();
+}
+
+DWORD InstallBundledUsbWifi(_In_ POOBE_PROGRESS Progress)
+{
+    static const WCHAR KeyName[]=L"SOFTWARE\\THYFOS\\Setup\\AsusUsbWifi";
+    HDEVINFO Set;
+    SP_DEVINFO_DATA Device={sizeof(Device)};
+    DWORD Index,Type,Result,Attempted=0,Bytes=sizeof(Attempted);
+    BOOL Present=FALSE,Reboot=FALSE;
+    WCHAR Hardware[2048],Folder[MAX_PATH],Path[MAX_PATH];
+    HKEY Key;
+    if (!THYFOS_USB_WIFI_FILE_COUNT || _wcsicmp(GetArchitectureName(),L"amd64")) return ERROR_SUCCESS;
+    Set=SetupDiGetClassDevsW(NULL,NULL,NULL,DIGCF_PRESENT|DIGCF_ALLCLASSES);
+    if (Set==INVALID_HANDLE_VALUE) return GetLastError();
+    for (Index=0; SetupDiEnumDeviceInfo(Set,Index,&Device); ++Index)
+    {
+        ZeroMemory(Hardware,sizeof(Hardware));
+        if (SetupDiGetDeviceRegistryPropertyW(Set,&Device,SPDRP_HARDWAREID,&Type,(BYTE*)Hardware,
+            sizeof(Hardware)-2*sizeof(WCHAR),NULL) && Type==REG_MULTI_SZ && ThyfosAsusUsbWifiIds(Hardware))
+        { Present=TRUE; break; }
+    }
+    SetupDiDestroyDeviceInfoList(Set);
+    if (!Present) return ERROR_SUCCESS;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE,KeyName,L"Attempted",RRF_RT_REG_DWORD,NULL,&Attempted,&Bytes)==ERROR_SUCCESS && Attempted)
+    {
+        Bytes=sizeof(Result);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE,KeyName,L"Result",RRF_RT_REG_DWORD,NULL,&Result,&Bytes)!=ERROR_SUCCESS)
+            return ERROR_INVALID_DATA;
+        return IsInstallSuccess(Result)?ERROR_SUCCESS:Result;
+    }
+    if (!GetWindowsDirectoryW(Folder,ARRAYSIZE(Folder)) ||
+        FAILED(StringCchCatW(Folder,ARRAYSIZE(Folder),L"\\DriverSetup\\ASUS-WiFi"))) return ERROR_BUFFER_OVERFLOW;
+    for (Index=0; Index<THYFOS_USB_WIFI_FILE_COUNT; ++Index)
+    {
+        if (FAILED(StringCchPrintfW(Path,ARRAYSIZE(Path),L"%s\\%s",Folder,ThyfosUsbWifiFiles[Index].Name)))
+            return ERROR_BUFFER_OVERFLOW;
+        if (!FileHashMatches(Path,ThyfosUsbWifiFiles[Index].Hash)) return (DWORD)TRUST_E_BAD_DIGEST;
+    }
+    if (FAILED(StringCchPrintfW(Path,ARRAYSIZE(Path),L"%s\\%s",Folder,THYFOS_USB_WIFI_INF))) return ERROR_BUFFER_OVERFLOW;
+    Result=RegCreateKeyExW(HKEY_LOCAL_MACHINE,KeyName,0,NULL,0,KEY_SET_VALUE,NULL,&Key,NULL);
+    if (Result!=ERROR_SUCCESS) return Result;
+    Attempted=1;
+    Result=RegSetValueExW(Key,L"Attempted",0,REG_DWORD,(BYTE*)&Attempted,sizeof(Attempted));
+    if (Result!=ERROR_SUCCESS) { RegCloseKey(Key); return Result; }
+    Result=ERROR_IO_PENDING;
+    RegSetValueExW(Key,L"Result",0,REG_DWORD,(BYTE*)&Result,sizeof(Result));
+    SetWindowTextW(Progress->hwndActivity,L"Installing ASUS USB Wi-Fi support");
+    SetWindowTextW(Progress->hwndItem,L"Using the verified, original Realtek driver package.");
+    Result=UpdateDriverForPlugAndPlayDevicesW(NULL,THYFOS_USB_WIFI_HARDWARE_ID,Path,
+        INSTALLFLAG_NONINTERACTIVE,&Reboot)?ERROR_SUCCESS:GetLastError();
+    RegSetValueExW(Key,L"Result",0,REG_DWORD,(BYTE*)&Result,sizeof(Result));
+    RegSetValueExW(Key,L"RebootRequired",0,REG_DWORD,(BYTE*)&Reboot,sizeof(Reboot));
+    RegCloseKey(Key);
+    return Result;
 }
 
 DWORD InstallBundledWifi(_In_ POOBE_PROGRESS Progress)

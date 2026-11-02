@@ -7,6 +7,16 @@
 #pragma once
 #include <wchar.h>
 
+static BOOL ThyfosAsusUsbWifiIds(const WCHAR *Hardware)
+{
+    const WCHAR *Id;
+    const WCHAR Match[]=L"USB\\VID_0B05&PID_184C";
+    for (Id=Hardware; *Id; Id+=wcslen(Id)+1)
+        if (!_wcsnicmp(Id,Match,ARRAYSIZE(Match)-1) &&
+            (Id[ARRAYSIZE(Match)-1]==0 || Id[ARRAYSIZE(Match)-1]==L'&')) return TRUE;
+    return FALSE;
+}
+
 static BOOL ThyfosIntelWifiIds(const WCHAR *Hardware, const WCHAR *Compatible)
 {
     BOOL Intel=FALSE, Wireless=FALSE;

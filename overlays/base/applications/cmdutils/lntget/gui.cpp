@@ -11,6 +11,7 @@
 #include <shellapi.h>
 
 #include "category.hpp"
+#include "catalog_retry.hpp"
 #include "details.hpp"
 #include "gui.hpp"
 #include "http.hpp"
@@ -62,6 +63,7 @@ enum : UINT_PTR
     TimerSelect = 2,
     TimerSpinner = 3,
     TimerSize = 4,
+    TimerCatalogRetry = 5,
 };
 
 enum class BlockKind
@@ -112,6 +114,7 @@ struct PreparedCatalog
 struct CatalogResult
 {
     bool ok = false;
+    DWORD code = ERROR_SUCCESS;
     std::string error;
     PreparedCatalog catalog;
 };
@@ -571,6 +574,7 @@ private:
         if (!status)
         {
             result->error = status.message;
+            result->code = status.code;
         }
         else
         {
@@ -1252,6 +1256,7 @@ struct CatalogWindow
     unsigned sizeDotPhase = 1;
     bool selectFirst = false;
     bool buildingTree = false;
+    unsigned catalogRetries = 0;
     int treeWidth = 0;
     int infoHeight = 0;
     int drag = 0;
@@ -1503,6 +1508,8 @@ void ApplyFilter(CatalogWindow &state)
         state.filtered.push_back(entry.second);
 
     state.selected = -1;
+    state.info.blocks.clear();
+    RelayoutInfo(state.info);
     state.worker.CancelDetails();
     state.generation = 0;
     StopSpinner(state);
@@ -2326,6 +2333,13 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
         case WM_NOTIFY:
             return HandleNotify(*state, lParam);
         case WM_TIMER:
+            if (wParam == TimerCatalogRetry)
+            {
+                KillTimer(window, TimerCatalogRetry);
+                if (!state->loading && !state->failure.empty())
+                    SendMessageW(window, WM_COMMAND, IdRefresh, 0);
+                return 0;
+            }
             if (wParam == TimerSearch)
             {
                 KillTimer(window, TimerSearch);
@@ -2373,6 +2387,7 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
                 case IdRefresh:
                     if (!state->loading)
                     {
+                        KillTimer(window, TimerCatalogRetry);
                         state->loading = true;
                         state->cache.clear();
                         state->worker.CancelDetails();
@@ -2505,13 +2520,19 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
                 UpdateStatusBar(*state);
                 InfoBlock title;
                 title.kind = BlockKind::Title;
-                title.text = L"The winget catalog is not available";
+                title.text = state->catalog.packages.empty() ? L"Connect to load the app catalog" : L"The catalog could not be refreshed";
                 InfoBlock reason;
                 reason.kind = BlockKind::Body;
                 reason.text = WideFromUtf8(result->error);
                 InfoBlock hint;
                 hint.kind = BlockKind::Status;
-                hint.text = L"Run \u201clntget source update\u201d, or import a source2.msix, then press Refresh.";
+                hint.text = L"Connect in Settings > Network & internet, then choose Retry. VirtualBox uses NAT Ethernet.";
+                SetWindowTextW(state->refresh, L"Retry");
+                if (CatalogRetryable(result->code) && state->catalogRetries < 3)
+                {
+                    ++state->catalogRetries;
+                    SetTimer(window, TimerCatalogRetry, 5000, nullptr);
+                }
                 state->info.blocks.clear();
                 state->info.blocks.push_back(title);
                 state->info.blocks.push_back(reason);
@@ -2521,6 +2542,9 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
                 return 0;
             }
             state->failure.clear();
+            state->catalogRetries = 0;
+            KillTimer(window, TimerCatalogRetry);
+            SetWindowTextW(state->refresh, L"Refresh");
             state->catalog.packages.swap(result->catalog.packages);
             state->catalog.counts.swap(result->catalog.counts);
             delete result;
@@ -2656,10 +2680,6 @@ Status RunCatalogGui(SourceManager &source, const std::string &initialQuery)
     UpdateWindow(window);
     UpdateStatusBar(state);
 
-    MessageBoxW(window,
-                L"The winget catalog contains applications published for Windows. Some packages may not install or run correctly on THYFOS yet.",
-                L"THYFOS Store compatibility", MB_OK | MB_ICONWARNING);
-
     if (!state.worker.Start(window, &source))
     {
         DestroyWindow(window);
@@ -2672,6 +2692,11 @@ Status RunCatalogGui(SourceManager &source, const std::string &initialQuery)
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
     {
+        if (message.message == WM_KEYDOWN && message.wParam == VK_F5)
+        {
+            SendMessageW(window, WM_COMMAND, IdRefresh, 0);
+            continue;
+        }
         if (message.message == WM_KEYDOWN && message.wParam == 'F' && (GetKeyState(VK_CONTROL) & 0x8000))
         {
             SetFocus(state.search);

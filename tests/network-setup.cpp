@@ -14,7 +14,7 @@
 
 static int Installs, Opens;
 static BOOL Next, Cancel, Adapter, ThreadFailure;
-static DWORD DriverResult, PostedResult;
+static DWORD DriverResult, PostedResult, ServiceResult;
 static LPTHREAD_START_ROUTINE PendingThread;
 static LPVOID PendingParameter;
 static WCHAR Executable[MAX_PATH], Arguments[MAX_PATH + 64];
@@ -24,6 +24,8 @@ VOID SetupFrameSetButtons(HWND, BOOL, BOOL Value) { Next = Value; }
 VOID EnableSetupCancel(HWND, BOOL Value) { Cancel = Value; }
 INT SetupMessage(HWND, PCWSTR, TASKDIALOG_COMMON_BUTTON_FLAGS, INT, PCWSTR, PCWSTR) { return IDOK; }
 DWORD InstallBundledWifi(POOBE_PROGRESS) { ++Installs; return DriverResult; }
+DWORD InstallBundledUsbWifi(POOBE_PROGRESS) { return ERROR_SUCCESS; }
+DWORD EnsureWifiService(VOID) { return ServiceResult; }
 static HANDLE WINAPI MockThread(LPSECURITY_ATTRIBUTES, SIZE_T, LPTHREAD_START_ROUTINE Entry, LPVOID Parameter, DWORD, LPDWORD)
 {
     if (ThreadFailure) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return NULL; }
@@ -60,12 +62,15 @@ static BOOL WINAPI MockProcess(LPCWSTR File, LPWSTR Command, LPSECURITY_ATTRIBUT
 #define WlanFreeMemory MockFree
 #define WlanCloseHandle MockClose
 #define CreateProcessW MockProcess
+#define SendMessageW MockSend
+static LRESULT WINAPI MockSend(HWND Page, UINT Message, WPARAM WParam, LPARAM LParam)
+{ return NetworkPageProc(Page, Message, WParam, LParam); }
 #include "network.c"
 
 static void Reset()
 {
     Installs = Opens = 0; Next = Cancel = TRUE; Adapter = TRUE; ThreadFailure = FALSE;
-    DriverResult = PostedResult = 0; NetworkReady = NetworkBusy = FALSE;
+    DriverResult = PostedResult = ServiceResult = 0; NetworkReady = NetworkBusy = FALSE;
     PendingThread = NULL;
 }
 
@@ -91,7 +96,9 @@ int wmain()
     NetworkPageProc(NULL, PM_NETWORK_READY, PostedResult, 0);
     if (Opens || !Next || !Cancel) return 8;
     Adapter = TRUE; NetworkPageProc(NULL, WM_COMMAND, IDC_NETWORK_REFRESH, 0);
-    if (Opens != 1 || Installs != 1) return 9;
+    if (Next || Cancel) return 9;
+    PendingThread(PendingParameter); NetworkPageProc(NULL, PM_NETWORK_READY, PostedResult, 0);
+    if (Opens != 1 || Installs != 2) return 9;
     Reset(); Adapter = FALSE; DriverResult = ERROR_TIMEOUT;
     NetworkPageProc(NULL, SPN_SETACTIVE, 0, 0); PendingThread(PendingParameter);
     NetworkPageProc(NULL, PM_NETWORK_READY, PostedResult, 0);
@@ -100,6 +107,10 @@ int wmain()
     NetworkPageProc(NULL, SPN_SETACTIVE, 0, 0);
     NetworkPageProc(NULL, PM_NETWORK_READY, PostedResult, 0);
     if (NetworkSetupResult() != ERROR_NOT_ENOUGH_MEMORY || !Next || !Cancel || Installs) return 11;
+    Reset(); Adapter = FALSE; ServiceResult = ERROR_SERVICE_DISABLED;
+    NetworkPageProc(NULL, SPN_SETACTIVE, 0, 0); PendingThread(PendingParameter);
+    NetworkPageProc(NULL, PM_NETWORK_READY, PostedResult, 0);
+    if (NetworkSetupResult() != ERROR_SERVICE_DISABLED || !Next || !Cancel || Opens) return 12;
     puts("Driver-before-Wi-Fi ordering, installed Settings path, offline continuation, revisit, refresh and failure recovery passed; no host installer or Wi-Fi change");
     return 0;
 }

@@ -1,0 +1,37 @@
+{
+  "name": "ASUS USB-AC53 Nano / Realtek RTL8812BU",
+  "hardware_id": "USB\\VID_0B05&PID_184C",
+  "version": "1030.52.1216.2025",
+  "inf": "netrtwlanu.inf",
+  "source": "Local Windows driver-store export of oem4.inf; binaries not committed",
+  "files": [
+    {
+      "name": "netrtwlanu.cat",
+      "sha256": "b20e2d328b96f006d435d2793e1360e81e53581d3c3ccb0d455802f500efe556"
+    },
+    {
+      "name": "netrtwlanu.inf",
+      "sha256": "341afbc5eb4ff1663f6e8bb1776377f2acd11a917f82de953facee9496e89161"
+    },
+    {
+      "name": "RTUWPSrvcLib.dll",
+      "sha256": "39a6da4a7b9d5cfb121039f4a79dc6a1e08de4cd330fa8ac5c133ab4f988e5f4"
+    },
+    {
+      "name": "RTUWPSrvcMain.exe",
+      "sha256": "bb5338a282f5b2f44a5b4262f780af2c358261fc921d6c711a5dcb33d400b0c7"
+    },
+    {
+      "name": "RTUWPUsbSwExt.dll",
+      "sha256": "31413029bb7020b49c866bf806a34a5a173c6c5de159f260da2195f5d31ccb46"
+    },
+    {
+      "name": "RTUWPWlanExt.dll",
+      "sha256": "5e4ae1555be8e6084cdf703d60f5975e8c9714360f7c0968c432ffe9363db4f3"
+    },
+    {
+      "name": "rtwlanu.sys",
+      "sha256": "d6bd2d1ac1251684856d2a6674499881ebd1139d4f1e2f6fb3bc41da40c8034e"
+    }
+  ]
+}

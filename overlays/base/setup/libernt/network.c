@@ -60,18 +60,22 @@ static VOID NetworkOpenWifi(HWND Page)
 static VOID NetworkShowState(HWND Page, BOOL OpenWifi)
 {
     WCHAR Text[512];
-    DWORD Reboot = 0, Bytes = sizeof(Reboot);
+    DWORD Reboot = 0, UsbReboot = 0, Bytes = sizeof(Reboot);
     BOOL Present = NetworkHasWifi();
     RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\THYFOS\\Setup\\IntelWiFi24.80", L"RebootRequired",
         RRF_RT_REG_DWORD, NULL, &Reboot, &Bytes);
+    Bytes = sizeof(UsbReboot);
+    RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\THYFOS\\Setup\\AsusUsbWifi", L"RebootRequired",
+        RRF_RT_REG_DWORD, NULL, &UsbReboot, &Bytes);
+    Reboot = Reboot || UsbReboot;
     ShowWindow(GetDlgItem(Page, IDC_PROCESSPROGRESS), SW_HIDE);
     SetDlgItemTextW(Page, IDC_ACTIVITY, L"Choose your connection");
     if (NetworkResult != ERROR_SUCCESS)
         StringCchPrintfW(Text, ARRAYSIZE(Text),
-            L"The Intel Wi-Fi installer did not complete (error %lu). Check Windows\\DriverSetup for the installer and log. You can use an existing adapter, Ethernet, or continue offline.", NetworkResult);
+            L"Wi-Fi driver setup did not complete (error %lu). Check Windows\\DriverSetup for the package and log. You can use an existing adapter, Ethernet, or continue offline.", NetworkResult);
     else if (Reboot && !Present)
         StringCchCopyW(Text, ARRAYSIZE(Text),
-            L"The Intel installer requested a restart. Finish setup offline, then restart to activate the driver. Ethernet can be used now. Wi-Fi Settings will be available after restart if the adapter starts successfully.");
+            L"Wi-Fi driver setup requested a restart. Finish setup offline, then restart to activate the driver. Ethernet can be used now. Wi-Fi Settings will be available after restart if the adapter starts successfully.");
     else if (Present)
         StringCchCopyW(Text, ARRAYSIZE(Text),
             L"Wi-Fi is available. Choose your network in Wi-Fi Settings, select Connect, and enter its password. Return here and choose Next when you are ready.");
@@ -89,10 +93,16 @@ static DWORD WINAPI NetworkDriverThread(LPVOID Parameter)
     HWND Page = (HWND)Parameter;
     OOBE_PROGRESS Progress;
     DWORD Result;
+    DWORD UsbResult;
+    DWORD ServiceResult;
     Progress.hwndActivity = GetDlgItem(Page, IDC_ACTIVITY);
     Progress.hwndItem = GetDlgItem(Page, IDC_ITEM);
     Progress.hwndProgress = GetDlgItem(Page, IDC_PROCESSPROGRESS);
     Result = InstallBundledWifi(&Progress);
+    UsbResult = InstallBundledUsbWifi(&Progress);
+    if (Result == ERROR_SUCCESS) Result = UsbResult;
+    ServiceResult = EnsureWifiService();
+    if (Result == ERROR_SUCCESS) Result = ServiceResult;
     PostMessageW(Page, PM_NETWORK_READY, Result, 0);
     return Result;
 }
@@ -117,7 +127,7 @@ INT_PTR CALLBACK NetworkPageProc(HWND Page, UINT Message, WPARAM WParam, LPARAM 
             EnableDlgItem(Page, IDC_NETWORK_WIFI, FALSE);
             EnableDlgItem(Page, IDC_NETWORK_REFRESH, FALSE);
             SetDlgItemTextW(Page, IDC_ACTIVITY, L"Preparing your Wi-Fi driver");
-            SetDlgItemTextW(Page, IDC_ITEM, L"Checking for an Intel wireless adapter and the bundled offline driver. Network selection follows this step.");
+            SetDlgItemTextW(Page, IDC_ITEM, L"Checking Intel wireless and ASUS USB Wi-Fi hardware against the bundled offline drivers. Network selection follows this step.");
             Thread = CreateThread(NULL, 0, NetworkDriverThread, Page, 0, NULL);
             if (Thread) CloseHandle(Thread);
             else PostMessageW(Page, PM_NETWORK_READY, GetLastError(), 0);
@@ -133,7 +143,12 @@ INT_PTR CALLBACK NetworkPageProc(HWND Page, UINT Message, WPARAM WParam, LPARAM 
         case WM_COMMAND:
             if (NetworkBusy) return TRUE;
             if (LOWORD(WParam) == IDC_NETWORK_WIFI) { NetworkOpenWifi(Page); return TRUE; }
-            if (LOWORD(WParam) == IDC_NETWORK_REFRESH) { NetworkShowState(Page, TRUE); return TRUE; }
+            if (LOWORD(WParam) == IDC_NETWORK_REFRESH)
+            {
+                NetworkReady = FALSE;
+                SendMessageW(Page, SPN_SETACTIVE, 0, 0);
+                return TRUE;
+            }
             break;
         case SPN_WIZNEXT:
         case SPN_WIZBACK:
