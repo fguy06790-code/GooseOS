@@ -1,3 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <polygon fill="#087FBB" points="64,7 117,94 87,82 76,65 70,65 70,108 58,108 58,65 52,65 41,82 11,94"/>
+  <polygon fill="#087FBB" points="64,4 79,44 122,46 89,73 100,115 64,92 28,115 39,73 6,46 49,44" mask="url(#cut)"/>
+  <mask id="cut"><rect width="128" height="128" fill="white"/><path d="M48 49H80V57H68V82H60V57H48Z"/></mask>
 </svg>
