@@ -8,3 +8,4 @@ add_importlibs(thyfos shell32 shlwapi advapi32 user32 gdi32 ole32 msvcrt kernel3
 add_cd_file(TARGET thyfos DESTINATION reactos FOR all)
 add_cd_file(FILE ${CMAKE_CURRENT_SOURCE_DIR}/release.json DESTINATION reactos FOR all)
 add_cd_file(FILE ${CMAKE_CURRENT_SOURCE_DIR}/thyfos-wallpaper.bmp DESTINATION reactos/Web/Wallpaper FOR all)
+add_cd_file(FILE ${CMAKE_CURRENT_SOURCE_DIR}/neofetch.cmd ${CMAKE_CURRENT_SOURCE_DIR}/thyfos-logo.txt DESTINATION reactos/system32 FOR all)
