@@ -795,7 +795,7 @@ private:
 
     RECT SearchRect() const
     {
-        RECT rc = { m_Theme.Scale(16), m_Theme.Scale(56), PanelLeft() - m_Theme.Scale(16), m_Theme.Scale(88) };
+        RECT rc = { m_Theme.Scale(16), m_Theme.Scale(58), PanelLeft() - m_Theme.Scale(16), m_Theme.Scale(88) };
         return rc;
     }
 
@@ -816,7 +816,7 @@ private:
     }
 
     int PanelLeft() const { return ContentLeft() - m_Theme.Scale(16); }
-    int PanelRadius() const { return m_Theme.Scale(8); }
+    int PanelRadius() const { return m_Theme.Scale(16); }
 
     int ContentRight() const
     {

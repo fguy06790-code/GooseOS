@@ -822,7 +822,17 @@ struct Theme
         text = GetSysColor(COLOR_WINDOWTEXT);
         face = GetSysColor(COLOR_BTNFACE);
         accent = GetSysColor(COLOR_HOTLIGHT);
-        dim = Blend(text, window, 150);
+        HIGHCONTRASTW contrast{sizeof(contrast)};
+        if (SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0) &&
+            !(contrast.dwFlags & HCF_HIGHCONTRASTON))
+        {
+            const bool dark = GetRValue(window) * 299 + GetGValue(window) * 587 + GetBValue(window) * 114 < 128000;
+            window = dark ? RGB(21, 32, 47) : RGB(250, 253, 255);
+            face = dark ? RGB(16, 26, 40) : RGB(237, 244, 252);
+            text = dark ? RGB(233, 242, 255) : RGB(22, 42, 65);
+            accent = dark ? RGB(100, 198, 250) : RGB(7, 101, 155);
+        }
+        dim = Blend(text, window, 170);
         chip = Blend(text, window, 30);
         line = Blend(text, window, 55);
         operation = Blend(accent, window, 20);
@@ -1359,9 +1369,9 @@ void LayoutWindow(CatalogWindow &state)
     const int statusHeight = statusRect.bottom - statusRect.top;
     height -= statusHeight;
 
-    const int header = state.theme.Px(96);
+    const int header = state.theme.Px(108);
     const int splitter = state.theme.Px(6);
-    const int margin = state.theme.Px(12);
+    const int margin = state.theme.Px(16);
     const int actionWidth = state.theme.Px(82);
     const int installedWidth = state.theme.Px(112);
     const int buttonHeight = state.theme.Px(30);
@@ -1375,14 +1385,14 @@ void LayoutWindow(CatalogWindow &state)
     MoveWindow(state.about, width - margin - installedWidth - gap - actionWidth, state.theme.Px(15), actionWidth, buttonHeight, TRUE);
 
     int right = width - margin;
-    MoveWindow(state.install, right - actionWidth, state.theme.Px(57), actionWidth, buttonHeight, TRUE);
+    MoveWindow(state.install, right - actionWidth, state.theme.Px(62), actionWidth, buttonHeight, TRUE);
     right -= actionWidth + gap;
-    MoveWindow(state.download, right - actionWidth, state.theme.Px(57), actionWidth, buttonHeight, TRUE);
+    MoveWindow(state.download, right - actionWidth, state.theme.Px(62), actionWidth, buttonHeight, TRUE);
     right -= actionWidth + gap;
-    MoveWindow(state.refresh, right - actionWidth, state.theme.Px(57), actionWidth, buttonHeight, TRUE);
+    MoveWindow(state.refresh, right - actionWidth, state.theme.Px(62), actionWidth, buttonHeight, TRUE);
     right -= actionWidth + state.theme.Px(14);
     const int searchWidth = std::max(state.theme.Px(160), right - margin);
-    MoveWindow(state.search, margin, state.theme.Px(57), searchWidth, buttonHeight, TRUE);
+    MoveWindow(state.search, margin, state.theme.Px(62), searchWidth, buttonHeight, TRUE);
 
     const int operationHeight = state.operationVisible ? state.theme.Px(86) : 0;
     const int operationTop = height - operationHeight;
@@ -2279,8 +2289,8 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
         case WM_GETMINMAXINFO:
         {
             MINMAXINFO *info = reinterpret_cast<MINMAXINFO *>(lParam);
-            info->ptMinTrackSize.x = 760;
-            info->ptMinTrackSize.y = 520;
+            info->ptMinTrackSize.x = state->theme.Px(760);
+            info->ptMinTrackSize.y = state->theme.Px(520);
             return 0;
         }
         case WM_ERASEBKGND:
@@ -2289,7 +2299,7 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
             GetClientRect(window, &client);
             HDC dc = reinterpret_cast<HDC>(wParam);
             FillRect(dc, &client, state->theme.faceBrush);
-            RECT header{0, 0, client.right, state->theme.Px(96)};
+            RECT header{0, 0, client.right, state->theme.Px(108)};
             FillRect(dc, &header, state->theme.windowBrush);
             RECT headerLine{0, header.bottom - 1, client.right, header.bottom};
             FillRect(dc, &headerLine, state->theme.lineBrush);

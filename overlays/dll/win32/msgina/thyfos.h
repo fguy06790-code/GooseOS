@@ -83,7 +83,27 @@ static void ThyfosChrome(HDC Dc, Gdiplus::Graphics &G, const ThyfosLayout &L, fl
                          HFONT BrandFont, HFONT HeadingFont, HFONT BodyFont, BOOL Hot, BOOL Busy)
 {
     const COLORREF Ink = RGB(21, 26, 32);
-    ThyfosText(Dc, BrandFont, L"THYFOS", L.Brand, Ink, DT_LEFT);
+    static const Gdiplus::PointF Peaks[][6] = {
+        {{64.00f, 4.00f}, {84.00f, 45.00f}, {73.00f, 41.00f}, {64.00f, 30.00f}, {55.00f, 41.00f}, {44.00f, 45.00f}},
+        {{121.06f, 45.46f}, {88.25f, 77.15f}, {88.66f, 65.45f}, {96.34f, 53.49f}, {83.09f, 48.33f}, {75.89f, 39.11f}},
+        {{99.27f, 112.54f}, {58.99f, 91.13f}, {70.24f, 87.90f}, {83.98f, 91.51f}, {84.80f, 77.32f}, {91.35f, 67.62f}},
+        {{28.73f, 112.54f}, {36.65f, 67.62f}, {43.20f, 77.32f}, {44.02f, 91.51f}, {57.76f, 87.90f}, {69.01f, 91.13f}},
+        {{6.94f, 45.46f}, {52.11f, 39.11f}, {44.91f, 48.33f}, {31.66f, 53.49f}, {39.34f, 65.45f}, {39.75f, 77.15f}}
+    };
+    Gdiplus::SolidBrush Mark(Gdiplus::Color(255, 8, 127, 187));
+    const float Size = 72 * Scale / 128;
+    for (const auto &Peak : Peaks)
+    {
+        Gdiplus::PointF Points[6];
+        for (int I = 0; I < 6; ++I)
+            Points[I] = Gdiplus::PointF(L.Brand.left + Peak[I].X * Size,
+                                        (L.Brand.top + L.Brand.bottom - 72 * Scale) / 2 + Peak[I].Y * Size);
+        G.FillPolygon(&Mark, Points, 6);
+    }
+    G.Flush(Gdiplus::FlushIntentionSync);
+    RECT Brand = L.Brand;
+    Brand.left += (int)(84 * Scale);
+    ThyfosText(Dc, BrandFont, L"THYFOS", Brand, Ink, DT_LEFT);
     RECT Shadow = L.Panel;
     OffsetRect(&Shadow, 0, (int)(12 * Scale));
     ThyfosRound(G, Shadow, 36 * Scale, 30, RGB(16, 34, 55));
