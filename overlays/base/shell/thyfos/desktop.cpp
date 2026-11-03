@@ -31,7 +31,7 @@ static BOOL Launcher;
 static float LauncherMotion, LauncherFrom;
 static DWORD LauncherStarted;
 static RECT Dock, LauncherButton, Panel, Input, OpenButton, TaskRects[12], OldWorkArea;
-static RECT AppRows[4];
+static RECT AppRows[5];
 static int ActiveApp=-1;
 static HFONT BodyFont, ClockFont, HeadingFont;
 static HBRUSH EditBrush;
@@ -343,8 +343,8 @@ static void Render(HDC Dc)
         RECT Heading={Panel.left+S(28), Input.bottom+S(30), Panel.right-S(28), Input.bottom+S(72)};
         Label(Dc, HeadingFont, L"Launcher", Heading);
         WCHAR ChromePath[MAX_PATH];
-        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer",L"Settings",L"THYFOS Store"};
-        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular",L"settings_20_regular",L"apps_20_regular"};
+        const PCWSTR Names[]={FindChrome(ChromePath,MAX_PATH)?L"Google Chrome":L"Install Google Chrome",L"File Explorer",L"Settings",L"THYFOS Store",L"Terminal"};
+        const PCWSTR Icons[]={L"globe_20_regular",L"folder_20_regular",L"settings_20_regular",L"apps_20_regular",L"code_20_regular"};
         for (int I=0; I<(int)_countof(AppRows); ++I)
         {
             Round(G,AppRows[I],(float)S(16),I==ActiveApp?85:35,RGB(218,237,255));
@@ -404,6 +404,11 @@ static void OpenProgram(PCWSTR File, PCWSTR Args=NULL)
     if ((INT_PTR)Result<=32)
         MessageBoxW(Desktop,L"The app or path could not be opened. Check the name and try again.",L"THYFOS",MB_OK|MB_ICONINFORMATION);
     else { SetWindowTextW(Search,L""); if (Launcher) ToggleLauncher(); }
+}
+
+static void OpenTerminal()
+{
+    OpenProgram(L"cmd.exe", L"/d /k title THYFOS Terminal & color 0B & lntget rice");
 }
 
 static void OpenSettings()
@@ -475,6 +480,7 @@ static void OpenCommand()
     if (!lstrcmpiW(Command,L"settings") || !lstrcmpiW(Command,L"systemsettings") ||
         !lstrcmpiW(Command,L"systemsettings.exe")) { OpenSettings(); return; }
     if (!lstrcmpiW(Command,L"explorer") || !lstrcmpiW(Command,L"file explorer")) { OpenProgram(L"filebrowser.exe"); return; }
+    if (!lstrcmpiW(Command,L"terminal")) { OpenTerminal(); return; }
     if (!lstrcmpiW(Command,L"store") || !lstrcmpiW(Command,L"thyfos store")) { OpenProgram(L"thyfos-store.exe"); return; }
     StringCchCopyW(File, _countof(File), Command);
     Args[0]=0;
@@ -494,6 +500,7 @@ static void OpenLauncherApp(int Index)
     else if (Index==1) OpenProgram(L"filebrowser.exe");
     else if (Index==2) OpenSettings();
     else if (Index==3) OpenProgram(L"thyfos-store.exe");
+    else if (Index==4) OpenTerminal();
 }
 
 static LRESULT CALLBACK EditProc(HWND W, UINT M, WPARAM A, LPARAM B)
@@ -616,10 +623,11 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
             if (ResourceWidget && PtInRect(&ResourceCard,P) && !(Launcher && PtInRect(&Panel,P))) OpenProgram(L"taskmgr11.exe");
             else if (PtInRect(&LauncherButton,P)) ToggleLauncher();
             else if (Launcher && PtInRect(&OpenButton,P)) OpenCommand();
-            else if (Launcher && PtInRect(&AppRows[0],P)) OpenChrome();
-            else if (Launcher && PtInRect(&AppRows[1],P)) OpenProgram(L"filebrowser.exe");
-            else if (Launcher && PtInRect(&AppRows[2],P)) OpenSettings();
-            else if (Launcher && PtInRect(&AppRows[3],P)) OpenProgram(L"thyfos-store.exe");
+            else if (Launcher && PtInRect(&Panel,P))
+            {
+                for (int I=0; I<(int)_countof(AppRows); ++I)
+                    if (PtInRect(&AppRows[I],P)) { OpenLauncherApp(I); break; }
+            }
             else
             {
                 for (int I=0;I<TaskCount;++I) if (PtInRect(&TaskRects[I],P))

@@ -112,3 +112,14 @@ lntget source update
 
 Open Settings > Apps > Installed apps to uninstall software. This feature is newer than the published v1.0.0 ISO; rebuilding `main` includes it.
 
+
+### Terminal and ricing tools
+
+Open **Terminal** from the desktop launcher or type `terminal` in its search box. Use `lntget rice` to list the curated downloads.
+
+- `lntget rice fastfetch` downloads the Fastfetch ZIP. Extract it and run `fastfetch.exe`. The `neofetch` name is an alias for Fastfetch.
+- `lntget rice cava` downloads the CAVA x64 MSI. Run the installer from the printed path. Live visualization requires working guest audio.
+- `lntget rice cmatrix` downloads the CMatrix executable. Run it from the printed path and press Ctrl+C to stop.
+- `lntget search <name>` searches the broader community catalog. `lntget help` lists the download and installation commands.
+
+The curated commands download hash-verified Windows builds to a per-package folder and print the full path. Internet access is required.

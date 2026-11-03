@@ -42,6 +42,7 @@ void PrintHelp()
     std::printf(
         "lntget %.*s - THYFOS package manager for the WinGet community repository\n\n"
         "Usage:\n"
+        "  lntget rice [fastfetch|neofetch|cava|cmatrix]\n"
         "  lntget search [[-q] <query>] [--id|--name|--moniker|--tag|--command <value>] [-e] [-n <count>]\n"
         "  lntget show <query> [--id <id>] [-e]\n"
         "  lntget download <query> [--id <id>] [--architecture <arch>]\n"
@@ -403,6 +404,64 @@ Status SelfTestCommand()
 
 } // namespace
 
+Status RiceCommand(const std::vector<std::string> &arguments)
+{
+    if (arguments.size() == 2)
+    {
+        std::puts(
+            "THYFOS Terminal\n"
+            "  lntget rice fastfetch   Download a Neofetch-style system information tool\n"
+            "  lntget rice cava        Download the CAVA audio visualizer installer\n"
+            "  lntget rice cmatrix     Download the Windows digital rain executable\n"
+            "  lntget search <name>    Find more packages in the community catalog\n"
+            "  lntget help             See all package commands");
+        return Status::Ok();
+    }
+
+    static const struct
+    {
+        const char *name;
+        const char *version;
+        const char *url;
+        const char *sha256;
+    } tools[] = {
+        {"fastfetch", "2.60.0",
+         "https://github.com/fastfetch-cli/fastfetch/releases/download/2.60.0/fastfetch-windows-amd64.zip",
+         "fecbdc2f25aede90aaa57d44fb0d74e5a2c423b9f9982e16e475e5c2f957e3ee"},
+        {"cava", "1.0.0",
+         "https://github.com/karlstav/cava/releases/download/1.0.0/cava_win_x64_install.msi",
+         "fe0f95cf88573a4369baa3b85c4efe28aff6a5b6c75bb0f140ccf5c655544dab"},
+        {"cmatrix", "1.0",
+         "https://github.com/rdelia/cmatrix-win/releases/download/1.0/cmatrix.exe",
+         "3acda49f1daf16f793b33ad2fa76bba05369869e7dca01c74f325432a661d140"},
+    };
+
+    if (arguments.size() != 3)
+        return Status::Fail(ERROR_INVALID_PARAMETER, "usage: lntget rice [tool]");
+
+    const std::string name = AsciiEquals(arguments[2], "neofetch") ? "fastfetch" : arguments[2];
+    for (const auto &tool : tools)
+    {
+        if (!AsciiEquals(name, tool.name))
+            continue;
+
+        PackageRecord package;
+        package.id = package.name = tool.name;
+        package.version = tool.version;
+        InstallerEntry installer;
+        installer.architecture = "x64";
+        installer.url = tool.url;
+        installer.sha256 = tool.sha256;
+        std::wstring path;
+        InstallerService service;
+        const Status status = service.Download(package, installer, nullptr, path);
+        if (status)
+            std::printf("Downloaded to: %s\n", Utf8FromWide(path).c_str());
+        return status;
+    }
+    return Status::Fail(ERROR_NOT_FOUND, "unknown ricing tool. Run lntget rice to see available tools.");
+}
+
 int Main(const std::vector<std::string> &arguments)
 {
     if (arguments.size() < 2 || arguments[1] == "--help" || arguments[1] == "-?" || arguments[1] == "help")
@@ -421,6 +480,9 @@ int Main(const std::vector<std::string> &arguments)
     }
     if (arguments[1] == "selftest")
         return Report(SelfTestCommand());
+
+    if (arguments[1] == "rice")
+        return Report(RiceCommand(arguments));
 
     SourceManager source;
     if (arguments[1] == "source")
