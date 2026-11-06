@@ -89,4 +89,3 @@ private:
     PWLAN_INTERFACE_INFO_LIST m_Interfaces;
     DWORD m_Result;
 };
-
