@@ -4,6 +4,7 @@
 #include <stdio.h>
 int wmain()
 {
+    goose_init(0, nullptr);
     WNDCLASSW C={}; C.lpfnWndProc=DefWindowProcW; C.hInstance=GetModuleHandleW(NULL); C.lpszClassName=L"THYFOS.OpacityTest";
     if (!RegisterClassW(&C)) return 1;
     HWND W=CreateWindowW(C.lpszClassName,L"Opacity test",WS_OVERLAPPEDWINDOW,0,0,200,100,NULL,NULL,C.hInstance,NULL);

@@ -1,5 +1,11 @@
 # Validation
 
+## Desktop layout migration checked on 2026-11-06
+
+Desktop layout calculations now run in Goose, including DPI scaling/rounding, animated launcher position, task buttons, app rows, search edit, and widget placement. A native differential harness compares the original C++ layout with Goose across 468 screen/task/motion/widget configurations. Five native checks and fifteen cross-suite checks pass locally. Native desktop tests initialize Goose before invoking migrated layout code.
+
+The first GitHub Windows run exposed a test executable without its Common Controls v6 manifest (loader exit 0xc0000139). The Store test now embeds the same manifest as the application, rather than relying on Wine's broader default exports. This affects the host test build; the production Store already carries that manifest.
+
 ## Goose language port checked on 2026-11-06
 
 The Goose v2026.3 compiler (runtime `4d3da949e563`) generated the production library from `goose/core.goose`. Four native Linux tests passed, with AddressSanitizer/UndefinedBehaviorSanitizer enabled for native C++ test code. The amd64 cross suite passed all 14 checks: 12 Windows binaries under Wine 10 and two Goose-source tests using the Linux host compiler. This includes actual generated C export calls and the existing Store/launcher/setup/WLAN regressions. The spectrum export matched the original C++ exactly across 33,792 band comparisons (96 stereo profiles and 11 rates, including zero and UINT32_MAX).

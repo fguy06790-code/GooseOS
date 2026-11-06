@@ -177,29 +177,30 @@ static BOOL CALLBACK CollectTask(HWND W, LPARAM)
     return TRUE;
 }
 
+static RECT NativeGooseRect(const desktop_Rect_g7 &R)
+{
+    RECT Result={R.left_g,R.top_g,R.right_g,R.bottom_g};
+    return Result;
+}
+
 static void Arrange()
 {
-    int D = S(76), DW = S(240 + TaskCount * 54);
-    if (DW > Width - S(40)) DW = Width - S(40);
-    SetRect(&Dock, (Width-DW)/2, Height-D-S(18), (Width+DW)/2, Height-S(18));
-    SetRect(&LauncherButton, Dock.left+S(12), Dock.top+S(9), Dock.left+S(70), Dock.bottom-S(9));
-    for (int I=0; I<TaskCount; ++I)
-        SetRect(&TaskRects[I], Dock.left+S(86+I*54), Dock.top+S(10), Dock.left+S(134+I*54), Dock.bottom-S(10));
-    SetRect(&Panel, S(24), max(S(80), Dock.top-S(510)), min(Width-S(24), S(464)), Dock.top-S(16));
-    OffsetRect(&Panel,0,(int)(S(24)*(1.0f-LauncherMotion)));
-    SetRect(&Input, Panel.left+S(20), Panel.top+S(24), Panel.right-S(20), Panel.top+S(72));
-    SetRect(&OpenButton, Panel.right-S(120), Panel.bottom-S(66), Panel.right-S(20), Panel.bottom-S(24));
-    int RowTop=Input.bottom+S(82);
-    int RowStep=min(S(62),(OpenButton.top-S(12)-RowTop)/(int)_countof(AppRows));
-    for (int I=0; I<(int)_countof(AppRows); ++I)
-        SetRect(&AppRows[I],Panel.left+S(20),RowTop+I*RowStep,Panel.right-S(20),RowTop+(I+1)*RowStep-S(8));
-    int CardWidth=min(S(420),Width-S(48));
-    SetRect(&ResourceCard,Width-S(24)-CardWidth,Dock.top-S(174),Width-S(24),Dock.top-S(18));
-    int AudioBottom=ResourceWidget?ResourceCard.top-S(14):Dock.top-S(18);
-    SetRect(&AudioCard,Width-S(24)-CardWidth,AudioBottom-S(182),Width-S(24),AudioBottom);
+    desktop_Layout_g7 Layout={};
+    thyfos_arrange(Width,Height,Scale,TaskCount,LauncherMotion,ResourceWidget!=FALSE,&Layout);
+    Dock=NativeGooseRect(Layout.dock_g);
+    LauncherButton=NativeGooseRect(Layout.launcher_g);
+    Panel=NativeGooseRect(Layout.panel_g);
+    Input=NativeGooseRect(Layout.input_g);
+    OpenButton=NativeGooseRect(Layout.open_button_g);
+    ResourceCard=NativeGooseRect(Layout.resources_g);
+    AudioCard=NativeGooseRect(Layout.audio_g);
+    for (int I=0;I<TaskCount;++I) TaskRects[I]=NativeGooseRect(Layout.tasks_g.e[I]);
+    for (int I=0;I<(int)_countof(AppRows);++I) AppRows[I]=NativeGooseRect(Layout.rows_g.e[I]);
     if (Search)
-        SetWindowPos(Search, NULL, Input.left+S(16), Input.top+S(12), Input.right-Input.left-S(32),
-                     S(26), SWP_NOZORDER | SWP_NOACTIVATE);
+    {
+        const RECT R=NativeGooseRect(Layout.search_g);
+        SetWindowPos(Search,NULL,R.left,R.top,R.right-R.left,R.bottom-R.top,SWP_NOZORDER|SWP_NOACTIVATE);
+    }
 }
 
 static void RefreshTasks()

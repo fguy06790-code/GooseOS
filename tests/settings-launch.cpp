@@ -15,6 +15,7 @@ static HINSTANCE WINAPI MockShellExecute(HWND,LPCWSTR,LPCWSTR File,LPCWSTR,LPCWS
 #include <stdio.h>
 int wmain()
 {
+    goose_init(0, nullptr);
     WCHAR Expected[MAX_PATH];
     GetWindowsDirectoryW(Expected,_countof(Expected));
     StringCchCatW(Expected,_countof(Expected),L"\\ImmersiveControlPanel\\SystemSettings.exe");

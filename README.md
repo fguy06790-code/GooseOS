@@ -6,6 +6,8 @@ An experimental migration of [THYFOS / LiberNT SuperLight](https://github.com/fg
 
 ## Implemented in Goose
 
+- `goose/desktop_layout.goose`: dock, launcher, task buttons, search box and resource/audio widget geometry. The native UI copies generated rectangles into Win32 structures.
+
 - `goose/spectrum.goose`: the desktop's 1024-sample stereo FFT and 32-band audio spectrum. Native audio capture passes samples to the Goose implementation; the former C++ FFT is removed.
 - `goose/catalog_retry.goose`: the Store's retry policy. It accepts the original seven transient network errors and excludes certificate, integrity, format and access failures.
 - `goose/core.goose`: the library entry point. The pinned Goose compiler generates its C implementation and header during the build. Generated C is an output, not the source implementation or a C++ fallback.
