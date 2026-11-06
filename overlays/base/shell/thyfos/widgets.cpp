@@ -6,6 +6,7 @@
  */
 #include <initguid.h>
 #include "widgets.h"
+#include <thyfos_goose.h>
 #include <mmreg.h>
 #include <ks.h>
 #include <ksmedia.h>
@@ -100,60 +101,13 @@ void DesktopMeters::SampleResources()
     GpuValid=SampleGpu(Gpu);
 }
 
-static void Transform(const float *Input,double *Real,double *Imaginary)
-{
-    const UINT N=ThyfosSpectrumSize;
-    for (UINT I=0; I<N; ++I)
-    { Real[I]=Input[I]*(0.5-0.5*cos(6.283185307179586*I/(N-1))); Imaginary[I]=0; }
-    for (UINT I=1,J=0; I<N; ++I)
-    {
-        UINT Bit=N>>1;
-        for (;J&Bit;Bit>>=1) J^=Bit;
-        J^=Bit;
-        if (I<J)
-        { double T=Real[I]; Real[I]=Real[J]; Real[J]=T; }
-    }
-    for (UINT Length=2; Length<=N; Length<<=1)
-    {
-        double Angle=-6.283185307179586/Length, WR=cos(Angle), WI=sin(Angle);
-        for (UINT I=0; I<N; I+=Length)
-        {
-            double R=1, Im=0;
-            for (UINT J=0; J<Length/2; ++J)
-            {
-                UINT A=I+J,B=A+Length/2;
-                double BR=Real[B]*R-Imaginary[B]*Im, BI=Real[B]*Im+Imaginary[B]*R;
-                Real[B]=Real[A]-BR; Imaginary[B]=Imaginary[A]-BI;
-                Real[A]+=BR; Imaginary[A]+=BI;
-                double Next=R*WR-Im*WI; Im=R*WI+Im*WR; R=Next;
-            }
-        }
-    }
-}
-
 void ThyfosSpectrum(const float *Left,const float *Right,UINT Rate,float *Bands)
 {
-    double LR[ThyfosSpectrumSize],LI[ThyfosSpectrumSize],RR[ThyfosSpectrumSize],RI[ThyfosSpectrumSize];
-    if (!Rate) { ZeroMemory(Bands,ThyfosSpectrumBands*sizeof(float)); return; }
-    Transform(Left,LR,LI); Transform(Right,RR,RI);
-    double High=Rate/2.0; if (High>16000) High=16000;
-    for (UINT Band=0; Band<ThyfosSpectrumBands; ++Band)
-    {
-        UINT First=(UINT)(60*pow(High/60.0,(double)Band/ThyfosSpectrumBands)*ThyfosSpectrumSize/Rate);
-        UINT Last=(UINT)(60*pow(High/60.0,(double)(Band+1)/ThyfosSpectrumBands)*ThyfosSpectrumSize/Rate);
-        if (First<1) First=1;
-        if (Last<=First) Last=First+1;
-        if (Last>ThyfosSpectrumSize/2) Last=ThyfosSpectrumSize/2;
-        double Peak=0;
-        for (UINT I=First; I<Last; ++I)
-        {
-            double Power=(LR[I]*LR[I]+LI[I]*LI[I]+RR[I]*RR[I]+RI[I]*RI[I])/2;
-            if (Power>Peak) Peak=Power;
-        }
-        double DB=20*log10(sqrt(Peak)/(ThyfosSpectrumSize/2)+1e-7)+6;
-        double Level=(DB+60)/60;
-        Bands[Band]=(float)(Level<0?0:Level>1?1:Level);
-    }
+    static_assert(ThyfosSpectrumSize==1024 && ThyfosSpectrumBands==32, "Goose spectrum interface size mismatch");
+    const sl_f32 LeftSlice={const_cast<float*>(Left),Rate?ThyfosSpectrumSize:0};
+    const sl_f32 RightSlice={const_cast<float*>(Right),Rate?ThyfosSpectrumSize:0};
+    const sl_f32 Output={Bands,ThyfosSpectrumBands};
+    thyfos_spectrum(LeftSlice,RightSlice,Rate,Output);
 }
 
 bool DesktopMeters::StartAudio()

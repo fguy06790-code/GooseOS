@@ -1,15 +1,18 @@
 name: Compile THYFOS amd64 ISO
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
 jobs:
+  regression-tests:
+    uses: ./.github/workflows/regression-tests.yml
   build-superlight-iso:
+    needs: regression-tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install prerequisites
         run: sudo apt-get update && sudo apt-get install -y build-essential git cmake ninja-build flex bison curl python3 xz-utils
+      - name: Install checksum-pinned Goose compiler
+        run: echo "GOOSE_COMPILER=$(python3 tools/bootstrap-goose.py)" >> "$GITHUB_ENV"
       - name: Build customized amd64 ISO
         env:
           WORK_ROOT: ${{ runner.temp }}/libernt-work

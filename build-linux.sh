@@ -10,6 +10,10 @@ for tool in git cmake ninja flex bison curl python3 tar gcc g++; do
     command -v "$tool" >/dev/null || { echo "Missing build prerequisite: $tool" >&2; exit 1; }
 done
 mkdir -p "$WORK_ROOT" "$OUTPUT_DIR"
+if [ -z "${GOOSE_COMPILER:-}" ]; then
+    GOOSE_COMPILER=$(python3 "$CONFIG_DIR/tools/bootstrap-goose.py" --destination "$WORK_ROOT/goose")
+fi
+export GOOSE_COMPILER
 if [ ! -f "$SOURCE_DIR/CMakeLists.txt" ]; then
     git clone --depth 1 https://github.com/LiberNT/LiberNT.git "$SOURCE_DIR"
     git -C "$SOURCE_DIR" fetch --depth 1 origin "$SOURCE_COMMIT"
@@ -36,6 +40,7 @@ export CCACHE_DISABLE=1
 export REACTOS_NESTED_BUILD_MIRROR=1
 cmake -S "$SOURCE_DIR" -B "$SOURCE_DIR/build" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE=toolchain-gcc.cmake -DARCH=amd64 \
+    -DGOOSE_COMPILER="$GOOSE_COMPILER" \
     -DCMAKE_BUILD_TYPE=MinSizeRel -DOPTIMIZE=1 -DENABLE_CCACHE=OFF \
     -DPREINSTALL_IMAGE_SIZE_MB=8192
 cmake --build "$SOURCE_DIR/build" --target bootcd --parallel "${BUILD_JOBS:-6}"

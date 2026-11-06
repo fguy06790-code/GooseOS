@@ -13,6 +13,7 @@
 #include <wchar.h>
 #include <shellframe.h>
 #include "widgets.h"
+#include <thyfos_goose.h>
 #include "preferences.h"
 #include <reactos/dwmframe.h>
 
@@ -675,6 +676,7 @@ static LRESULT CALLBACK WindowProc(HWND W,UINT M,WPARAM A,LPARAM B)
 
 int WINAPI wWinMain(HINSTANCE Instance,HINSTANCE,LPWSTR,int)
 {
+    goose_init(0, NULL);
     Gdiplus::GdiplusStartupInput Input;
     ULONG_PTR Token;
     if (Gdiplus::GdiplusStartup(&Token,&Input,NULL)!=Gdiplus::Ok) return 1;

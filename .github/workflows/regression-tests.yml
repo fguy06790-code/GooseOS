@@ -1,0 +1,56 @@
+name: THYFOS regression tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  scan-buffer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install checksum-pinned Goose compiler
+        run: echo "GOOSE_COMPILER=$(python3 tools/bootstrap-goose.py)" >> "$GITHUB_ENV"
+      - name: Test Goose ABI and scan-result buffer handling with sanitizers
+        run: |
+          cmake -S tests -B outputs/native-tests -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror -fsanitize=address,undefined"
+          cmake --build outputs/native-tests --parallel 2
+          ctest --test-dir outputs/native-tests --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: LiberNT/LiberNT
+          ref: 346eba3d855d70214105670f859e9dc0bb1c8615
+          path: work/LiberNT
+          sparse-checkout: |
+            base/applications/cmdutils/lntget
+            base/setup/libernt
+            base/shell/shellframe
+            sdk/include
+            sdk/lib/3rdparty/zlib
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
+      - name: Install checksum-pinned Goose compiler
+        shell: pwsh
+        run: |
+          $compiler = python tools/bootstrap-goose.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "GOOSE_COMPILER=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build and run isolated Windows regression tests
+        shell: msys2 {0}
+        run: |
+          cmake -S tests -B outputs/tests -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIBERNT_SOURCE_DIR="$GITHUB_WORKSPACE/work/LiberNT"
+          cmake --build outputs/tests --parallel 2
+          ctest --test-dir outputs/tests --output-on-failure

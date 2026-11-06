@@ -24,6 +24,28 @@ for item in (source / 'sdk/lib/crt').rglob('*'):
 modules = source / 'modules/CMakeLists.txt'
 content = modules.read_text().replace('add_subdirectory(cairo)', '').replace('add_subdirectory(chrome)', '')
 modules.write_text(content)
+# Goose's generated C library must exist before the native apps configure.
+# LiberNT adds its general modules directory after base, so stage this one
+# module explicitly in the target-only part of the top-level build.
+goose_module = source / 'modules/thyfos-goose'
+if goose_module.exists():
+    shutil.rmtree(goose_module)
+shutil.copytree(config / 'goose', goose_module / 'goose')
+shutil.copytree(config / 'cmake', goose_module / 'cmake')
+(goose_module / 'CMakeLists.txt').write_text(
+    'include("${CMAKE_CURRENT_LIST_DIR}/cmake/Goose.cmake")\n'
+    'add_thyfos_goose_library("${CMAKE_CURRENT_LIST_DIR}/goose")\n'
+    'add_cd_file(FILE "${CMAKE_CURRENT_LIST_DIR}/goose/GOOSE-LICENSE.txt" '
+    '"${CMAKE_CURRENT_LIST_DIR}/goose/THIRD_PARTY.md" '
+    'DESTINATION reactos/system32/licenses/goose FOR all)\n')
+top_level = source / 'CMakeLists.txt'
+content = top_level.read_text()
+goose_subdirectory = '    add_subdirectory(modules/thyfos-goose)\n'
+if goose_subdirectory not in content:
+    base_subdirectory = '    add_subdirectory(base)\n'
+    if content.count(base_subdirectory) != 1:
+        raise SystemExit('Expected one target-side base subdirectory entry')
+    top_level.write_text(content.replace(base_subdirectory, goose_subdirectory + base_subdirectory))
 hive = source / 'boot/bootdata/hivesft.inf'
 content = hive.read_text()
 old = '"%SystemRoot%\\explorer.exe"'

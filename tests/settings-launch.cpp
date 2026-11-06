@@ -37,10 +37,12 @@ int wmain()
     ActiveApp=2; EditProc(Search,WM_KEYDOWN,VK_DOWN,0);
     if (ActiveApp!=3) return 9;
     EditProc(Search,WM_KEYDOWN,VK_DOWN,0);
-    if (ActiveApp!=0) return 10;
+    if (ActiveApp!=4) return 10;
+    EditProc(Search,WM_KEYDOWN,VK_DOWN,0);
+    if (ActiveApp!=0) return 12;
     EditProc(Search,WM_KEYDOWN,VK_UP,0);
-    if (ActiveApp!=3) return 11;
+    if (ActiveApp!=4) return 11;
     DestroyWindow(Search); Search=NULL;
-    puts("Settings and Store launcher actions, aliases and four-row keyboard navigation passed; no app launched");
+    puts("Settings and Store launcher actions, aliases and five-row keyboard navigation passed; no app launched");
     return 0;
 }

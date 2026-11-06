@@ -362,7 +362,11 @@ Status DownloadOrInstallCommand(SourceManager &source, const CommandOptions &opt
     status = service.Install(installer, path, selection.mode, exitCode);
     if (!status)
         return status;
-    std::printf("Successfully installed %s.\n", package.name.c_str());
+    std::printf("Installer completed for %s.\n", package.name.c_str());
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+        std::puts("Restart your computer to finish installation.");
+    else if (exitCode == ERROR_SUCCESS_REBOOT_INITIATED)
+        std::puts("The installer initiated a restart.");
     std::printf("LNTGET_INSTALL_DONE id=%s exit=%lu\n", package.id.c_str(), exitCode);
     return Status::Ok();
 }

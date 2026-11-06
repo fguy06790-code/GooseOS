@@ -130,6 +130,7 @@ LoadOobeApps(
                 break;
             Items = NewItems;
             App = &Items[Count];
+            ZeroMemory(App, sizeof(*App));
 
             if (!GetInfString(hInf, AppSection, L"Name", App->Name, ARRAYSIZE(App->Name)) ||
                 !GetInfString(hInf, AppSection, L"Url", App->Url, ARRAYSIZE(App->Url)) ||
@@ -418,8 +419,7 @@ DownloadFile(
     IBackgroundCopyManager* Manager = NULL;
     IBackgroundCopyJob* Job = NULL;
     BG_JOB_PROGRESS JobProgress;
-    BG_JOB_STATE State;
-    BG_JOB_STATE LastState = BG_JOB_STATE_QUEUED;
+    BG_JOB_STATE State = BG_JOB_STATE_QUEUED;
     UINT64 LastBytes = 0;
     DWORD LastChange = GetTickCount();
     HRESULT hr, hrJob = E_FAIL;
@@ -452,7 +452,10 @@ DownloadFile(
     {
         hr = IBackgroundCopyJob_GetState(Job, &State);
         if (FAILED(hr))
+        {
+            hrJob = hr;
             break;
+        }
 
         if (SUCCEEDED(IBackgroundCopyJob_GetProgress(Job, &JobProgress)))
         {
@@ -468,12 +471,6 @@ DownloadFile(
             }
         }
 
-        if (State != LastState)
-        {
-            LastState = State;
-            LastChange = GetTickCount();
-        }
-
         if (State == BG_JOB_STATE_TRANSFERRED)
         {
             hr = IBackgroundCopyJob_Complete(Job);
@@ -484,17 +481,13 @@ DownloadFile(
         if (State == BG_JOB_STATE_ERROR)
         {
             hrJob = GetJobError(Job, E_FAIL);
-            IBackgroundCopyJob_Cancel(Job);
             break;
         }
 
         if (State == BG_JOB_STATE_CANCELLED ||
-            (State != BG_JOB_STATE_TRANSIENT_ERROR &&
-             GetTickCount() - LastChange > APP_NO_PROGRESS_TIMEOUT))
+            GetTickCount() - LastChange >= APP_NO_PROGRESS_TIMEOUT)
         {
-            hrJob = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
-            if (State != BG_JOB_STATE_CANCELLED)
-                IBackgroundCopyJob_Cancel(Job);
+            hrJob = HRESULT_FROM_WIN32(State == BG_JOB_STATE_CANCELLED ? ERROR_CANCELLED : ERROR_TIMEOUT);
             break;
         }
 
@@ -504,7 +497,11 @@ DownloadFile(
 
 Quit:
     if (Job)
+    {
+        if (FAILED(hr) && State != BG_JOB_STATE_CANCELLED)
+            IBackgroundCopyJob_Cancel(Job);
         IBackgroundCopyJob_Release(Job);
+    }
     IBackgroundCopyManager_Release(Manager);
     return hr;
 }
@@ -535,8 +532,12 @@ FileHashMatches(
         goto Quit;
     }
 
-    while (ReadFile(hFile, Buffer, 0x10000, &Read, NULL) && Read != 0)
+    for (;;)
     {
+        if (!ReadFile(hFile, Buffer, 0x10000, &Read, NULL))
+            goto Quit;
+        if (Read == 0)
+            break;
         if (!BCRYPT_SUCCESS(BCryptHashData(hHash, Buffer, Read, 0)))
             goto Quit;
     }

@@ -5,8 +5,8 @@
  * COPYRIGHT:   Copyright 2026 Ahmed ARIF <arif.ing@outlook.com>
  */
 
-#include "settings.h"
 #include <winsock2.h>
+#include "settings.h"
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <wlanapi.h>
@@ -17,74 +17,9 @@
 #include <setupapi.h>
 #include <cfgmgr32.h>
 #include <algorithm>
+#include "wlan-session.h"
 
 #define EXPLORER_KEY L"Software\\ReactOS\\Explorer"
-
-class WlanSession
-{
-public:
-    WlanSession() : m_Handle(NULL), m_Interfaces(NULL)
-    {
-        DWORD version = 0;
-
-        if (WlanOpenHandle(2, NULL, &version, &m_Handle) != ERROR_SUCCESS)
-            m_Handle = NULL;
-        else if (WlanEnumInterfaces(m_Handle, NULL, &m_Interfaces) != ERROR_SUCCESS)
-            m_Interfaces = NULL;
-    }
-
-    ~WlanSession()
-    {
-        if (m_Interfaces)
-            WlanFreeMemory(m_Interfaces);
-        if (m_Handle)
-            WlanCloseHandle(m_Handle, NULL);
-    }
-
-    bool Available() const { return m_Interfaces && m_Interfaces->dwNumberOfItems; }
-    HANDLE Handle() const { return m_Handle; }
-    const GUID *Interface() const { return Available() ? &m_Interfaces->InterfaceInfo[0].InterfaceGuid : NULL; }
-    WLAN_INTERFACE_STATE State() const
-    {
-        return Available() ? m_Interfaces->InterfaceInfo[0].isState : wlan_interface_state_not_ready;
-    }
-
-    bool RadioOn()
-    {
-        PWLAN_RADIO_STATE state = NULL;
-        DWORD size = 0;
-        bool on = false;
-
-        if (!Available() ||
-            WlanQueryInterface(m_Handle, Interface(), wlan_intf_opcode_radio_state, NULL, &size, (PVOID *)&state,
-                               NULL) != ERROR_SUCCESS || !state)
-            return false;
-        for (DWORD i = 0; i < state->dwNumberOfPhys && i < WLAN_MAX_PHY_INDEX; i++)
-        {
-            if (state->PhyRadioState[i].dot11SoftwareRadioState == dot11_radio_state_on &&
-                state->PhyRadioState[i].dot11HardwareRadioState == dot11_radio_state_on)
-                on = true;
-        }
-        WlanFreeMemory(state);
-        return on;
-    }
-
-    void SetRadio(bool on)
-    {
-        WLAN_PHY_RADIO_STATE state;
-
-        if (!Available())
-            return;
-        ZeroMemory(&state, sizeof(state));
-        state.dot11SoftwareRadioState = on ? dot11_radio_state_on : dot11_radio_state_off;
-        state.dot11HardwareRadioState = dot11_radio_state_on;
-        WlanSetInterface(m_Handle, Interface(), wlan_intf_opcode_radio_state, sizeof(state), &state, NULL);
-    }
-
-private:
-    HANDLE m_Handle;
-    PWLAN_INTERFACE_INFO_LIST m_Interfaces;
-};
 
 static bool
 AirplaneMode()
@@ -92,23 +27,29 @@ AirplaneMode()
     return ReadDword(HKEY_CURRENT_USER, EXPLORER_KEY, L"AirplaneMode", 0) != 0;
 }
 
-static void
+static DWORD
 SetAirplaneMode(bool on)
 {
     WlanSession wlan;
     bool restore = ReadDword(HKEY_CURRENT_USER, EXPLORER_KEY, L"WifiRestore", 1) != 0;
+    DWORD result = wlan.Result();
 
     if (on)
     {
-        WriteDword(HKEY_CURRENT_USER, EXPLORER_KEY, L"WifiRestore", wlan.Available() && wlan.RadioOn());
+        bool previous = wlan.Available() && wlan.RadioOn();
+        if (wlan.Result() != ERROR_SUCCESS) return wlan.Result();
         if (wlan.Available())
-            wlan.SetRadio(false);
+            result = wlan.SetRadio(false);
+        if (result != ERROR_SUCCESS) return result;
+        WriteDword(HKEY_CURRENT_USER, EXPLORER_KEY, L"WifiRestore", previous);
     }
     else if (wlan.Available())
     {
-        wlan.SetRadio(restore);
+        result = wlan.SetRadio(restore);
     }
+    if (result != ERROR_SUCCESS) return result;
     WriteDword(HKEY_CURRENT_USER, EXPLORER_KEY, L"AirplaneMode", on);
+    return ERROR_SUCCESS;
 }
 
 static std::wstring
@@ -184,13 +125,14 @@ BuildNetwork(PageBuilder &page)
     SettingsHost *host = page.Host;
     std::vector<BYTE> table;
     const IP_ADAPTER_ADDRESSES *connected = NULL;
-    bool hasWlan = false, wifiOn = false;
+    bool wifiOn = false;
+    DWORD wifiResult = ERROR_SUCCESS;
 
     if (!page.Indexing)
     {
         WlanSession wlan;
-        hasWlan = wlan.Available();
-        wifiOn = hasWlan && wlan.RadioOn();
+        wifiOn = wlan.Available() && wlan.RadioOn();
+        wifiResult = wlan.Result();
         table = AdapterTable();
         for (const IP_ADAPTER_ADDRESSES *adapter = table.empty() ? NULL : (const IP_ADAPTER_ADDRESSES *)table.data();
              adapter; adapter = adapter->Next)
@@ -216,10 +158,10 @@ BuildNetwork(PageBuilder &page)
         }
     }
     page.Group();
-    if (hasWlan || page.Indexing)
     {
         SettingRow &row = page.Navigate(Str(IDS_PAGE_WIFI), Str(IDS_WIFI_DESC), L"wifi_1_20_regular", PageId::WiFi);
-        row.Value = page.Indexing ? std::wstring() : Str(wifiOn ? IDS_ON : IDS_OFF);
+        row.Value = page.Indexing ? std::wstring() : wifiResult != ERROR_SUCCESS ? Win32Message(wifiResult) :
+                    Str(wifiOn ? IDS_ON : IDS_OFF);
         row.Keywords = Str(IDS_WIFI_KEYWORDS);
     }
     for (const IP_ADAPTER_ADDRESSES *adapter = table.empty() ? NULL : (const IP_ADAPTER_ADDRESSES *)table.data();
@@ -233,7 +175,11 @@ BuildNetwork(PageBuilder &page)
             Str(adapter->OperStatus == IfOperStatusUp ? IDS_NET_CONNECTED : IDS_NET_DISCONNECTED);
     }
     page.Toggle(Str(IDS_AIRPLANE), Str(IDS_AIRPLANE_DESC), L"airplane_20_regular", !page.Indexing && AirplaneMode(),
-                [](int on) { SetAirplaneMode(on != 0); });
+                [host](int on)
+                {
+                    DWORD result = SetAirplaneMode(on != 0);
+                    if (result != ERROR_SUCCESS) ShowError(host->Window(), result);
+                });
     page.Navigate(Str(IDS_PAGE_PROXY), Str(IDS_PROXY_DESC), L"globe_20_regular", PageId::Proxy);
     page.Navigate(Str(IDS_ADVANCED_NETWORK), Str(IDS_ADVANCED_NETWORK_DESC), L"network_check_20_regular",
                   PageId::NetworkAdvanced);
@@ -251,7 +197,7 @@ struct NetworkConnection
 };
 
 static std::vector<NetworkConnection>
-NetworkConnections()
+EnumerateNetworkConnections()
 {
     std::vector<NetworkConnection> list;
     WCHAR guid[64];
@@ -331,7 +277,7 @@ BuildNetworkAdvanced(PageBuilder &page)
     page.Group(Str(IDS_NETWORK_ADAPTERS));
     if (page.Indexing)
         return;
-    connections = NetworkConnections();
+    connections = EnumerateNetworkConnections();
     if (connections.empty())
         page.Text(Str(IDS_NO_ADAPTERS));
     for (size_t i = 0; i < connections.size(); i++)
@@ -434,7 +380,7 @@ ConnectWifi(HWND owner, const WifiNetwork &network)
     DWORD result;
 
     if (!wlan.Available())
-        return ERROR_NOT_FOUND;
+        return wlan.Result() != ERROR_SUCCESS ? wlan.Result() : ERROR_NOT_FOUND;
     if (network.Auth == DOT11_AUTH_ALGO_RSNA || network.Auth == DOT11_AUTH_ALGO_WPA)
     {
         if (profile.empty())
@@ -480,6 +426,7 @@ BuildWiFi(PageBuilder &page)
     std::vector<WifiNetwork> networks;
     PWLAN_AVAILABLE_NETWORK_LIST list = NULL;
     bool on;
+    DWORD wifiResult = ERROR_SUCCESS;
 
     if (page.Indexing)
     {
@@ -493,22 +440,28 @@ BuildWiFi(PageBuilder &page)
         if (!wlan.Available())
         {
             page.Group();
-            page.Text(Str(IDS_WIFI_NONE));
+            page.Text(wlan.Result() != ERROR_SUCCESS ? Win32Message(wlan.Result()) : Str(IDS_WIFI_NONE));
             return;
         }
         on = wlan.RadioOn();
+        wifiResult = wlan.Result();
         if (on)
         {
             static ULONGLONG LastScan;
             ULONGLONG now = GetTickCount64();
             if (!LastScan || now - LastScan > 15000)
             {
-                WlanScan(wlan.Handle(), wlan.Interface(), NULL, NULL, NULL);
-                LastScan = now;
-                host->SetTimerRefresh(4000);
+                wifiResult = WlanScan(wlan.Handle(), wlan.Interface(), NULL, NULL, NULL);
+                if (wifiResult == ERROR_SUCCESS)
+                {
+                    LastScan = now;
+                    host->SetTimerRefresh(4000);
+                }
             }
         }
-        if (on && WlanGetAvailableNetworkList(wlan.Handle(), wlan.Interface(), 0, NULL, &list) == ERROR_SUCCESS && list)
+        DWORD listResult = on ? WlanGetAvailableNetworkList(wlan.Handle(), wlan.Interface(), 0, NULL, &list) : ERROR_SUCCESS;
+        if (listResult != ERROR_SUCCESS) wifiResult = listResult;
+        if (on && listResult == ERROR_SUCCESS && list)
         {
             for (DWORD i = 0; i < list->dwNumberOfItems; i++)
             {
@@ -547,10 +500,13 @@ BuildWiFi(PageBuilder &page)
                 [host](int value)
                 {
                     WlanSession wlan;
-                    wlan.SetRadio(value != 0);
+                    DWORD result = wlan.SetRadio(value != 0);
+                    if (result != ERROR_SUCCESS) ShowError(host->Window(), result);
                     host->SetTimerRefresh(1500);
                 });
     page.Navigate(Str(IDS_WIFI_KNOWN), Str(IDS_WIFI_KNOWN_DESC), L"wifi_1_20_regular", PageId::WiFiKnown);
+    if (wifiResult != ERROR_SUCCESS)
+        page.Text(Win32Message(wifiResult));
 
     if (!on)
         return;
@@ -561,13 +517,17 @@ BuildWiFi(PageBuilder &page)
                                       [host](int)
                                       {
                                           WlanSession wlan;
+                                          DWORD result = wlan.Result();
                                           if (wlan.Available())
-                                              WlanScan(wlan.Handle(), wlan.Interface(), NULL, NULL, NULL);
+                                              result = WlanScan(wlan.Handle(), wlan.Interface(), NULL, NULL, NULL);
+                                          else if (result == ERROR_SUCCESS)
+                                              result = ERROR_NOT_FOUND;
+                                          if (result != ERROR_SUCCESS) ShowError(host->Window(), result);
                                           host->SetTimerRefresh(4000);
                                       });
         UNREFERENCED_PARAMETER(row);
     }
-    if (networks.empty())
+    if (networks.empty() && wifiResult == ERROR_SUCCESS)
         page.Text(Str(IDS_WIFI_NO_NETWORKS));
     for (size_t i = 0; i < networks.size(); i++)
     {
@@ -586,7 +546,8 @@ BuildWiFi(PageBuilder &page)
                                           if (network.Connected)
                                           {
                                               WlanSession wlan;
-                                              result = WlanDisconnect(wlan.Handle(), wlan.Interface(), NULL);
+                                              result = wlan.Available() ? WlanDisconnect(wlan.Handle(), wlan.Interface(), NULL) :
+                                                       wlan.Result() != ERROR_SUCCESS ? wlan.Result() : ERROR_NOT_FOUND;
                                           }
                                           else
                                           {
@@ -610,11 +571,15 @@ BuildWiFiKnown(PageBuilder &page)
 
     page.Group();
     if (page.Indexing || !wlan.Available())
-        return;
-    if (WlanGetProfileList(wlan.Handle(), wlan.Interface(), NULL, &profiles) != ERROR_SUCCESS || !profiles ||
-        !profiles->dwNumberOfItems)
     {
-        page.Text(Str(IDS_WIFI_NO_KNOWN));
+        if (!page.Indexing)
+            page.Text(wlan.Result() != ERROR_SUCCESS ? Win32Message(wlan.Result()) : Str(IDS_WIFI_NONE));
+        return;
+    }
+    DWORD result = WlanGetProfileList(wlan.Handle(), wlan.Interface(), NULL, &profiles);
+    if (result != ERROR_SUCCESS || !profiles || !profiles->dwNumberOfItems)
+    {
+        page.Text(result != ERROR_SUCCESS ? Win32Message(result) : Str(IDS_WIFI_NO_KNOWN));
         if (profiles)
             WlanFreeMemory(profiles);
         return;

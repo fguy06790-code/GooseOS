@@ -1960,7 +1960,7 @@ void HideBackgroundProgress(CatalogWindow &state)
 
 void BeginOperation(CatalogWindow &state, bool install)
 {
-    if (state.operationBusy || state.selected < 0 || static_cast<std::size_t>(state.selected) >= state.filtered.size())
+    if (state.loading || state.operationBusy || state.selected < 0 || static_cast<std::size_t>(state.selected) >= state.filtered.size())
         return;
     const GuiPackage &package = state.catalog.packages[state.filtered[state.selected]];
     PackageRecord record;
@@ -2034,8 +2034,14 @@ void ApplyOperationUpdate(CatalogWindow &state, const OperationUpdate &update)
         case OperationStage::Complete:
         {
             state.operationBusy = false;
-            SetWindowTextW(state.operationTitle, update.install ? L"Installation complete" : L"Download complete");
-            const std::wstring detail = update.install ? name + L" is ready to use." : L"Saved to " + update.path;
+            const bool rebootRequired = update.install && update.exitCode == ERROR_SUCCESS_REBOOT_REQUIRED;
+            const bool rebootInitiated = update.install && update.exitCode == ERROR_SUCCESS_REBOOT_INITIATED;
+            SetWindowTextW(state.operationTitle, rebootRequired ? L"Restart required" : rebootInitiated ? L"Restart initiated" :
+                           update.install ? L"Installation complete" : L"Download complete");
+            const std::wstring detail = !update.install ? L"Saved to " + update.path :
+                rebootRequired ? name + L" installer completed. Restart your computer to finish installation." :
+                rebootInitiated ? name + L" installer completed and initiated a restart." :
+                name + L" installer completed successfully.";
             SetWindowTextW(state.operationDetail, detail.c_str());
             SetWindowTextW(state.operationPercent, L"Done");
             SetOperationMarquee(state, false);
@@ -2226,15 +2232,20 @@ LRESULT HandleNotify(CatalogWindow &state, LPARAM lParam)
         if (header->code == LVN_ITEMCHANGED)
         {
             const NMLISTVIEW *view = reinterpret_cast<const NMLISTVIEW *>(lParam);
-            if ((view->uChanged & LVIF_STATE) && (view->uNewState & LVIS_SELECTED))
+            if ((view->uChanged & LVIF_STATE) &&
+                ((view->uNewState & LVIS_SELECTED) || view->iItem == -1 || state.selected == view->iItem))
             {
                 state.worker.CancelDetails();
                 state.generation = 0;
                 StopSpinner(state);
                 StopSizeAnimation(state);
-                state.selected = view->iItem;
+                KillTimer(state.window, TimerSelect);
+                state.selected = (view->uNewState & LVIS_SELECTED) ? view->iItem : -1;
                 UpdateActionButtons(state);
-                SetTimer(state.window, TimerSelect, 160, nullptr);
+                if (state.selected >= 0)
+                    SetTimer(state.window, TimerSelect, 160, nullptr);
+                else
+                    ShowDetails(state);
             }
             return 0;
         }
@@ -2251,7 +2262,12 @@ LRESULT HandleNotify(CatalogWindow &state, LPARAM lParam)
         }
         if (header->code == NM_DBLCLK)
         {
-            BeginOperation(state, true);
+            const NMITEMACTIVATE *activation = reinterpret_cast<const NMITEMACTIVATE *>(lParam);
+            LVHITTESTINFO hit{};
+            hit.pt = activation->ptAction;
+            const int item = ListView_SubItemHitTest(state.list, &hit);
+            if (item >= 0 && item == state.selected)
+                BeginOperation(state, true);
             return 0;
         }
     }
@@ -2346,7 +2362,7 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
             if (wParam == TimerCatalogRetry)
             {
                 KillTimer(window, TimerCatalogRetry);
-                if (!state->loading && !state->failure.empty())
+                if (!state->loading && !state->operationBusy && !state->failure.empty())
                     SendMessageW(window, WM_COMMAND, IdRefresh, 0);
                 return 0;
             }
@@ -2395,7 +2411,7 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
                     BeginOperation(*state, false);
                     return 0;
                 case IdRefresh:
-                    if (!state->loading)
+                    if (!state->loading && !state->operationBusy)
                     {
                         KillTimer(window, TimerCatalogRetry);
                         state->loading = true;
@@ -2630,6 +2646,7 @@ LRESULT CALLBACK CatalogProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
 
 Status RunCatalogGui(SourceManager &source, const std::string &initialQuery)
 {
+    goose_init(0, nullptr);
     FreeConsole();
 
     INITCOMMONCONTROLSEX controls{};
