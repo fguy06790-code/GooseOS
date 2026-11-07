@@ -1,5 +1,11 @@
 # Validation
 
+## Widget math migration checked on 2026-11-07
+
+Resource-counter arithmetic, 8/16/24/32-bit PCM decoding, float-sample sanitization, and spectrum smoothing/decay now execute in `goose/widget_math.goose`. Native Win32 counter queries, WASAPI/COM lifetime management and float bit loading remain in the C++ adapter. Exports run on the desktop UI thread initialized by the existing entry point.
+
+Six native tests and sixteen cross-suite checks passed locally. The widget-specific native host compares the generated Goose code with the prior arithmetic over 265,808 PCM samples (exhaustive 8/16-bit values, deterministic 24/32-bit samples and sign boundaries), invalid and extreme counters, NaN/infinity/signed zero, and 100 smoothing/decay updates. The native test is compiled with ASan/UBSan; the generated Goose runtime itself is not instrumented by the C++ sanitizer flag. The changed production widgets.cpp compiled to an amd64 object using real pinned D3DKMT headers. There is no new guest boot, hardware/audio capture trial, Windows 11 baseline or ISO validation for this change.
+
 ## Desktop layout migration checked on 2026-11-06
 
 Desktop layout calculations now run in Goose, including DPI scaling/rounding, animated launcher position, task buttons, app rows, search edit, and widget placement. A native differential harness compares the original C++ layout with Goose across 468 screen/task/motion/widget configurations. Five native checks and fifteen cross-suite checks pass locally. Native desktop tests initialize Goose before invoking migrated layout code.

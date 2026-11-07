@@ -19,6 +19,7 @@ ctest --test-dir outputs/tests --output-on-failure
 The suite covers:
 
 - Actual Goose retry policy, spectrum code and generated-header C ABI from a native host.
+- Widget arithmetic and PCM decoding parity, invalid counters, sample boundaries, signed zero, and smoothing/decay.
 - Catalog retry exclusions for trust/format failures.
 - Wireless hardware-ID matching, WLAN service transitions and error propagation.
 - Driver-before-network setup ordering and offline continuation.

@@ -1,5 +1,7 @@
 # Goose language port — unreleased
 
+- Widget counter percentages, PCM decoding, float sanitization and smoothing now run in Goose, with native ABI/differential regression coverage.
+
 - The desktop spectrum algorithm and Store retry policy are implemented in `.goose` source and linked through generated C interfaces.
 - Builds require checksum-pinned Goose v2026.3 and initialize its runtime on the calling UI thread.
 - Added Goose source tests and native ABI tests; retained earlier native bug fixes below.

@@ -6,6 +6,8 @@ An experimental migration of [THYFOS / LiberNT SuperLight](https://github.com/fg
 
 ## Implemented in Goose
 
+- `goose/widget_math.goose`: CPU/RAM/GPU percentages, signed PCM decoding, floating-point sample sanitization, and audio-spectrum smoothing/decay. The native widget code supplies counter samples and borrowed audio buffers through the generated ABI.
+
 - `goose/desktop_layout.goose`: dock, launcher, task buttons, search box and resource/audio widget geometry. The native UI copies generated rectangles into Win32 structures.
 
 - `goose/spectrum.goose`: the desktop's 1024-sample stereo FFT and 32-band audio spectrum. Native audio capture passes samples to the Goose implementation; the former C++ FFT is removed.

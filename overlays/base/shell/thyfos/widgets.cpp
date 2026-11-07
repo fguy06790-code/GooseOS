@@ -14,7 +14,6 @@
 #include <math.h>
 #include <string.h>
 
-static double ClampPercent(double V) { return V<0?0:V>100?100:V; }
 static ULONGLONG TimeValue(const FILETIME &T)
 {
     ULARGE_INTEGER U; U.LowPart=T.dwLowDateTime; U.HighPart=T.dwHighDateTime; return U.QuadPart;
@@ -68,8 +67,8 @@ static bool SampleGpu(double &Value)
                 ULONGLONG Running=(ULONGLONG)Q.QueryResult.NodeInformation.GlobalInformation.RunningTime.QuadPart;
                 if (Old.Valid && Running>=Old.Running && Now.QuadPart>Old.Clock)
                 {
-                    double Seconds=(double)(Now.QuadPart-Old.Clock)/Frequency.QuadPart;
-                    double Usage=ClampPercent((Running-Old.Running)/(Seconds*10000000.0)*100.0);
+                    double Usage=thyfos_gpu_percent(Running-Old.Running,
+                        (ULONGLONG)(Now.QuadPart-Old.Clock),(ULONGLONG)Frequency.QuadPart);
                     if (Usage>Value) Value=Usage;
                     Valid=true;
                 }
@@ -89,15 +88,14 @@ void DesktopMeters::SampleResources()
     if (GetSystemTimes(&Idle,&Kernel,&User))
     {
         ULONGLONG I=TimeValue(Idle), T=TimeValue(Kernel)+TimeValue(User);
-        if (CpuPrimed && T>PreviousTotal && I>=PreviousIdle)
-        { Cpu=ClampPercent(100.0*(1.0-(double)(I-PreviousIdle)/(T-PreviousTotal))); CpuValid=true; }
+        CpuValid=thyfos_cpu_percent(PreviousTotal,PreviousIdle,T,I,CpuPrimed,&Cpu)!=0;
         PreviousIdle=I; PreviousTotal=T; CpuPrimed=true;
     }
     else CpuPrimed=false;
     MEMORYSTATUSEX M={sizeof(M)};
-    RamValid=GlobalMemoryStatusEx(&M) && M.ullTotalPhys>0 && M.ullAvailPhys<=M.ullTotalPhys;
+    RamValid=GlobalMemoryStatusEx(&M) && thyfos_ram_percent(M.ullTotalPhys,M.ullAvailPhys,&Ram)!=0;
     if (RamValid)
-    { MemoryTotal=M.ullTotalPhys; MemoryUsed=M.ullTotalPhys-M.ullAvailPhys; Ram=100.0*MemoryUsed/MemoryTotal; }
+    { MemoryTotal=M.ullTotalPhys; MemoryUsed=M.ullTotalPhys-M.ullAvailPhys; }
     GpuValid=SampleGpu(Gpu);
 }
 
@@ -157,12 +155,10 @@ void DesktopMeters::StopAudio()
 
 float DesktopMeters::ReadSample(const BYTE *Data) const
 {
-    if (FloatSamples) { float V; memcpy(&V,Data,sizeof(V)); return V!=V?0:V<-1?-1:V>1?1:V; }
-    if (Format->wBitsPerSample==8) return ((int)Data[0]-128)/128.0f;
-    if (Format->wBitsPerSample==16) { SHORT V; memcpy(&V,Data,sizeof(V)); return V/32768.0f; }
-    if (Format->wBitsPerSample==24)
-    { int V=Data[0]|(Data[1]<<8)|(Data[2]<<16); if (V&0x800000) V-=0x1000000; return V/8388608.0f; }
-    INT32 V; memcpy(&V,Data,sizeof(V)); return (float)(V/2147483648.0);
+    if (FloatSamples)
+    { float V; memcpy(&V,Data,sizeof(V)); return thyfos_float_sample(V); }
+    const sl_u8 Input={const_cast<BYTE*>(Data),Format->wBitsPerSample/8};
+    return thyfos_pcm_sample(Input,Format->wBitsPerSample);
 }
 
 void DesktopMeters::SampleAudio()
@@ -200,7 +196,8 @@ void DesktopMeters::SampleAudio()
     if (Now-LastPacket>200)
     {
         Samples=0;
-        for (UINT I=0; I<ThyfosSpectrumBands; ++I) Bands[I]*=0.82f;
+        const sl_f32 Current={Bands,ThyfosSpectrumBands}, Empty={NULL,0};
+        thyfos_smooth_bands(Current,Empty,1);
         return;
     }
     if (Samples==ThyfosSpectrumSize)
@@ -209,7 +206,7 @@ void DesktopMeters::SampleAudio()
         for (UINT I=0; I<ThyfosSpectrumSize; ++I)
         { L[I]=Left[(WritePosition+I)%ThyfosSpectrumSize]; R[I]=Right[(WritePosition+I)%ThyfosSpectrumSize]; }
         ThyfosSpectrum(L,R,Format->nSamplesPerSec,Next);
-        for (UINT I=0; I<ThyfosSpectrumBands; ++I)
-            Bands[I]+=(Next[I]-Bands[I])*(Next[I]>Bands[I]?0.65f:0.18f);
+        const sl_f32 Current={Bands,ThyfosSpectrumBands}, Target={Next,ThyfosSpectrumBands};
+        thyfos_smooth_bands(Current,Target,0);
     }
 }
